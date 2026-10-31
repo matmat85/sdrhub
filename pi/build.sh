@@ -44,7 +44,11 @@ chroot "$MOUNT" /bin/bash /opt/loft-source/pi/install.sh
 chroot "$MOUNT" python3 -m compileall -q /opt/adsb/adsb-setup /usr/local/lib/loft
 chroot "$MOUNT" systemd-analyze verify loft-firstboot.service loft-firewall.service loft-rtl-tcp.service
 chroot "$MOUNT" systemd-analyze verify loft-display.service
-chroot "$MOUNT" systemctl is-enabled docker loft-firstboot loft-firewall loft-rtl-tcp adsb-setup
+chroot "$MOUNT" systemctl is-enabled docker loft-firstboot loft-firewall loft-rtl-tcp adsb-setup loft-display
+grep -qx 'include loft-display.txt' "$MOUNT/boot/firmware/config.txt"
+grep -qx 'dtoverlay=loft-lcd,rotate=90,speed=16000000' "$MOUNT/boot/firmware/loft-display.txt"
+[[ -s "$MOUNT/boot/firmware/overlays/loft-lcd.dtbo" ]] ||
+    { echo "Enabled display overlay is missing" >&2; exit 1; }
 rm "$MOUNT/etc/resolv.conf"
 mv "$ROOT/build/original-resolv.conf" "$MOUNT/etc/resolv.conf"
 [[ ! -e "$MOUNT/etc/loft-receiver/provisioned" && ! -e "$MOUNT/root/loft-credentials.txt" ]] ||

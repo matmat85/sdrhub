@@ -35,7 +35,7 @@ printf '[Unit]\nRequires=loft-firewall.service\nAfter=loft-firewall.service\n' >
 systemctl enable docker loft-firstboot loft-firewall loft-rtl-tcp
 # Keep our edited application rather than replacing it with upstream updates.
 systemctl disable adsb-update.timer
-bash /opt/loft-source/pi/display-install.sh --install-only
+bash /opt/loft-source/pi/display-install.sh --enable-image
 rm /usr/sbin/policy-rc.d
 apt-get clean
 cloud-init clean --logs --machine-id

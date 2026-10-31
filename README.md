@@ -58,13 +58,13 @@ image, and runs the scanner's device-argument regression tests.
 2. On a Proxmox VE 9 **host** as root, download and inspect the release installer:
 
    ```bash
-   curl -fL https://github.com/matmat85/sdrhub/releases/download/v0.1.1/proxmox.sh -o /root/loft-proxmox.sh
+   curl -fL https://github.com/matmat85/sdrhub/releases/download/v0.1.2/proxmox.sh -o /root/loft-proxmox.sh
    less /root/loft-proxmox.sh
    bash /root/loft-proxmox.sh
    ```
 
    For the enhanced installer with autodetected defaults, use the current
-   source version instead (it still installs the built `v0.1.1` release):
+   source version instead (it defaults to the `v0.1.2` release):
 
    ```bash
    curl -fL https://raw.githubusercontent.com/matmat85/sdrhub/main/scripts/proxmox.sh -o /root/loft-proxmox.sh
@@ -86,7 +86,7 @@ image, and runs the scanner's device-argument regression tests.
    13 LXCs with nesting enabled, downloads checksum-verified source and Docker
    image archives, installs software and prints unique login credentials.
    No GitHub/registry account is required. Existing CTs/VMs are not overwritten.
-   The enhanced source installer permits only one installer run per host.
+   The `v0.1.2` and enhanced source installers permit only one installer run per host.
    On failure or Ctrl+C, it automatically stops and removes CTs created by
    that run, including the first CT if the second installation fails.
    A unique description marker is checked before deletion; existing CTs/VMs

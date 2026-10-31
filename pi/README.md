@@ -6,7 +6,7 @@ Download `loft-pi.img.xz` and verify it against the release's `SHA256SUMS`.
 With Raspberry Pi Imager 2, load the release catalogue:
 
 ```text
-rpi-imager --repo https://github.com/matmat85/sdrhub/releases/download/v0.1.1/pi-imager.json
+rpi-imager --repo https://github.com/matmat85/sdrhub/releases/download/v0.1.2/pi-imager.json
 ```
 
 Select Raspberry Pi Zero 2 W and Loft SDR receiver. Configure your own username,
@@ -65,7 +65,7 @@ invalid provisioning fails visibly rather than opening unauthenticated setup.
 Upstream automatic application updates are disabled so they cannot overwrite
 this integration. Install updates through reviewed new project releases.
 
-## Optional 3.5-inch GPIO status display
+## 3.5-inch GPIO status display
 
 Experimental MPI3501/LCD35-style ILI9486 profile, 480x320 landscape, SPI.
 The LCDWiki pinout uses GPIO24 for data/command and GPIO25 for reset.
@@ -83,8 +83,11 @@ sudo bash ~/loft-sdr-source/pi/display-install.sh --enable
 sudo reboot
 ```
 
-Future image builds include the files but leave the display disabled by
-default. To enable them:
+The v0.1.2 image enables this experimental profile and the status service by
+default for the Zero 2 W. No manual enable step is needed after flashing.
+The screen controller and physical output still require verification; a
+480x320 product listing alone does not establish ILI9486 compatibility.
+To re-enable the display after disabling it:
 
 ```bash
 sudo bash /opt/loft-source/pi/display-install.sh --enable
@@ -117,7 +120,7 @@ running `LCD35-show`, which can replace unrelated boot settings.
 Disable and restore the normal headless receiver:
 
 ```bash
-sudo bash ~/loft-sdr-source/pi/display-install.sh --disable
+sudo bash /opt/loft-source/pi/display-install.sh --disable
 sudo reboot
 ```
 
