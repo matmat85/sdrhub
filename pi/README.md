@@ -6,7 +6,7 @@ Download `loft-pi.img.xz` and verify it against the release's `SHA256SUMS`.
 With Raspberry Pi Imager 2, load the release catalogue:
 
 ```text
-rpi-imager --repo https://github.com/matmat85/sdrhub/releases/download/v0.1.0/pi-imager.json
+rpi-imager --repo https://github.com/matmat85/sdrhub/releases/download/v0.1.1/pi-imager.json
 ```
 
 Select Raspberry Pi Zero 2 W and Loft SDR receiver. Configure your own username,

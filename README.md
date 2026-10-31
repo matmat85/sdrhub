@@ -53,7 +53,7 @@ image, and runs the scanner's device-argument regression tests.
 2. On a Proxmox VE 9 **host** as root, download and inspect the release installer:
 
    ```bash
-   curl -fL https://github.com/matmat85/sdrhub/releases/download/v0.1.0/proxmox.sh -o /root/loft-proxmox.sh
+   curl -fL https://github.com/matmat85/sdrhub/releases/download/v0.1.1/proxmox.sh -o /root/loft-proxmox.sh
    less /root/loft-proxmox.sh
    bash /root/loft-proxmox.sh
    ```

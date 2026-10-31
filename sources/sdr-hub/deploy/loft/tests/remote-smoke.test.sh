@@ -8,6 +8,8 @@ HUB="$NETWORK-hub"
 cleanup() {
     docker rm -f "$HUB" "$RADIO" >/dev/null 2>&1 || true
     docker network rm "$NETWORK" >/dev/null 2>&1 || true
+    docker run --rm --user 0:0 -v "$TMP:/cleanup" ubuntu:24.04 \
+        chown -hR "$(id -u):$(id -g)" /cleanup/data /cleanup/logs
     rm -rf -- "$TMP"
 }
 trap cleanup EXIT

@@ -4,6 +4,7 @@ ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 shellcheck -x -P "$ROOT/scripts" -P "$ROOT/pi" "$ROOT/scripts/"*.sh "$ROOT/pi/"*.sh
 docker run --rm --entrypoint bash -v "$ROOT:/release:ro" \
     ubuntu:24.04 /release/tests/proxmox.test.sh
+bash "$ROOT/tests/permissions.test.sh"
 docker build -f "$ROOT/sources/adsb-feeder-image/tests/installer/Dockerfile" \
     -t loft/feeder-installer-tests:local "$ROOT/sources/adsb-feeder-image"
 docker run --rm loft/feeder-installer-tests:local

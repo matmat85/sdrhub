@@ -29,7 +29,7 @@ main() {
         command -v "$cmd" >/dev/null || fail "Missing Proxmox prerequisite: $cmd"
     done
     [[ $(pveversion) == pve-manager/9.* ]] || fail "This installer targets Proxmox VE 9"
-    prompt TAG "Published release tag (not a branch)" v0.1.0
+    prompt TAG "Published release tag (not a branch)" v0.1.1
     [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "Use a version tag such as v0.1.0"
     prompt PI "Pi's reserved LAN IPv4 address" ""
     ipv4 "$PI" || fail "Invalid Pi address"
