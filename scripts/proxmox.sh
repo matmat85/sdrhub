@@ -131,7 +131,7 @@ main() {
     [[ $(pveversion) == pve-manager/9.* ]] || fail "This installer targets Proxmox VE 9"
     exec {INSTALL_LOCK}>/run/lock/loft-proxmox.lock
     flock -n "$INSTALL_LOCK" || fail "Another loft installer is running on this host"
-    prompt TAG "Published release tag (not a branch)" v0.1.2
+    prompt TAG "Published release tag (not a branch)" v0.1.3
     [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "Use a version tag such as v0.1.0"
     prompt PI "Pi's reserved LAN IPv4 address" ""
     ipv4 "$PI" || fail "Invalid Pi address"

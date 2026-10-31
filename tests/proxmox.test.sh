@@ -20,7 +20,7 @@ printf 'sha256:%064d\n' 0 > "$TMP/hub-image.txt"
 )
 prompt() {
     case "$1" in
-        TAG) TAG=v0.1.2 ;;
+        TAG) TAG=v0.1.3 ;;
         PI) PI=192.168.1.50 ;;
         ADSB_ID) ADSB_ID=${OVERRIDE_ADSB:-$3} ;;
         *) printf -v "$1" '%s' "$3" ;;

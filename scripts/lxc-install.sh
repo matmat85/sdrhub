@@ -17,7 +17,7 @@ for attempt in {1..60}; do
     if [[ "$attempt" == 60 ]]; then fail "No working network after waiting for DHCP"; fi
     sleep 2
 done
-apt-get install -y --no-install-recommends ca-certificates curl gnupg openssl jq
+apt-get install -y --no-install-recommends ca-certificates curl gnupg openssl jq python3
 curl -fsS --retry 5 --connect-timeout 5 https://download.docker.com/linux/debian/gpg -o /tmp/loft-docker.asc
 install -d -m 0755 /etc/apt/keyrings
 install -m 0644 /tmp/loft-docker.asc /etc/apt/keyrings/docker.asc
@@ -32,9 +32,11 @@ ipv4 "$ADDRESS" || fail "No LAN IPv4 address"
 PASSWORD=$(openssl rand -hex 18)
 if [[ "$ROLE" == hub ]]; then
     [[ -f /root/hub-image.tar.gz ]] || fail "Missing verified release image archive"
+    python3 "$ROOT/scripts/image_archive.py" /root/hub-image.tar.gz --expected "$IMAGE"
     docker load -i /root/hub-image.tar.gz
-    [[ $(docker image inspect "$IMAGE" --format '{{.Id}}') == "$IMAGE" ]] || fail "Loaded image does not match the release ID"
-    docker tag "$IMAGE" loft/sdrhub:release
+    LOADED_IMAGE=$(docker image inspect loft/sdr-hub:local --format '{{.Id}}')
+    python3 "$ROOT/scripts/image_archive.py" /root/hub-image.tar.gz --expected "$IMAGE" --loaded "$LOADED_IMAGE"
+    docker tag "$LOADED_IMAGE" loft/sdrhub:release
     install -d -m 0755 /opt/loft-hub/data /opt/loft-hub/logs
     cp "$ROOT/sources/sdr-hub/deploy/loft/compose.yml" /opt/loft-hub/compose.yml
     jq --arg endpoint "$PI:1234" '.devices[0].device_args.rtltcp=$endpoint' \

@@ -16,8 +16,8 @@ jobs:
       - name: Package container without requiring registry authentication
         run: |
           mkdir -p dist
-          docker image inspect loft/sdr-hub:local --format '{{.Id}}' > dist/hub-image.txt
           docker save loft/sdr-hub:local | gzip -1 > dist/hub-image.tar.gz
+          python3 scripts/image_archive.py dist/hub-image.tar.gz > dist/hub-image.txt
       - uses: actions/upload-artifact@v4
         with:
           name: hub-image
