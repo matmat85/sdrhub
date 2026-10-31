@@ -14,6 +14,11 @@ downloading a release.
 Physical Pi boot, real DAB audio and actual Proxmox installation remain
 unverified. Releases are explicitly marked prerelease until hardware testing.
 
+Optional experimental 3.5-inch ILI9486 GPIO LCD support now shows boot,
+Wi-Fi/IP and receiver service status. See the
+[display installation guide](pi/README.md#optional-35-inch-gpio-status-display).
+It can be installed on v0.1.1 without reflashing; its image remains unchanged.
+
 ## Architecture
 
 | Location | Function |
@@ -81,7 +86,20 @@ image, and runs the scanner's device-argument regression tests.
    13 LXCs with nesting enabled, downloads checksum-verified source and Docker
    image archives, installs software and prints unique login credentials.
    No GitHub/registry account is required. Existing CTs/VMs are not overwritten.
-   Failed new CTs are retained for diagnosis, not automatically destroyed.
+   The enhanced source installer permits only one installer run per host.
+   On failure or Ctrl+C, it automatically stops and removes CTs created by
+   that run, including the first CT if the second installation fails.
+   A unique description marker is checked before deletion; existing CTs/VMs
+   and CTs from earlier runs are never automatically removed. Partial creates
+   without a verifiable marker and cleanup errors are reported for manual
+   inspection. The published `v0.1.1` installer still retains failed CTs.
+
+   Before removing a CT left by an earlier failed run, inspect `pct list`
+   and `pct config <ID>`, confirm it belongs to that failed installation and
+   contains no needed data, and back it up if necessary. Do not infer ownership
+   from an ID or hostname alone. After verifying the exact ID, use
+   `pct stop <ID>` if running, then `pct destroy <ID>`. Destruction removes
+   the CT's disks; never do this to an unverified existing CT.
 
 3. Reserve both LXC DHCP addresses. Update the Pi receiver page with those
    addresses so its firewall permits their connections.

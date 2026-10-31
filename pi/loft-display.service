@@ -1,0 +1,15 @@
+[Unit]
+Description=Loft receiver LCD boot and network status
+After=systemd-udev-trigger.service
+
+[Service]
+ExecStart=/usr/bin/python3 /usr/local/lib/loft/display.py
+Restart=on-failure
+RestartSec=10
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

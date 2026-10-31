@@ -1,0 +1,38 @@
+/dts-v1/;
+/plugin/;
+
+/ {
+    compatible = "brcm,bcm2835";
+    fragment@0 {
+        target = <&spi0>;
+        __overlay__ { status = "okay"; };
+    };
+    fragment@1 {
+        target = <&spidev0>;
+        __overlay__ { status = "disabled"; };
+    };
+    fragment@2 {
+        target = <&spi0>;
+        __overlay__ {
+            #address-cells = <1>;
+            #size-cells = <0>;
+            lcd: display@0 {
+                compatible = "ilitek,ili9486";
+                reg = <0>;
+                spi-max-frequency = <16000000>;
+                rotate = <90>;
+                bgr;
+                fps = <5>;
+                buswidth = <8>;
+                regwidth = <16>;
+                reset-gpios = <&gpio 25 1>;
+                dc-gpios = <&gpio 24 0>;
+                debug = <0>;
+            };
+        };
+    };
+    __overrides__ {
+        rotate = <&lcd>,"rotate:0";
+        speed = <&lcd>,"spi-max-frequency:0";
+    };
+};

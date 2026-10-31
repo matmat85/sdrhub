@@ -65,7 +65,69 @@ invalid provisioning fails visibly rather than opening unauthenticated setup.
 Upstream automatic application updates are disabled so they cannot overwrite
 this integration. Install updates through reviewed new project releases.
 
-## Build
+## Optional 3.5-inch GPIO status display
+
+Experimental MPI3501/LCD35-style ILI9486 profile, 480x320 landscape, SPI.
+The LCDWiki pinout uses GPIO24 for data/command and GPIO25 for reset.
+XPT2046 identifies only touch, so visually similar clones may still need
+a different LCD driver. This profile does not enable touch or a fan.
+Never attach/remove the GPIO display while the Pi is powered.
+Use the pin-1 end of the Zero 2 W header and provide adequate power for
+the display (approximately 0.16 A at 5 V) and two dongles.
+
+On the existing v0.1.1 Pi image, SSH into the Pi and install the new support:
+
+```bash
+git clone --depth 1 https://github.com/matmat85/sdrhub.git ~/loft-sdr-source
+sudo bash ~/loft-sdr-source/pi/display-install.sh --enable
+sudo reboot
+```
+
+Future image builds include the files but leave the display disabled by
+default. To enable them:
+
+```bash
+sudo bash /opt/loft-source/pi/display-install.sh --enable
+sudo reboot
+```
+
+The independent `loft-display` service starts without waiting for Wi-Fi.
+It shows boot/system state, uptime, Wi-Fi link state, LAN IPv4 addresses,
+the setup URL, provisioning/web/RTL-TCP services and the ADS-B container
+state, refreshing every five seconds. Wi-Fi connected means an associated
+link, not verified Internet or LXC connectivity. Active radio/container
+status does not prove incoming RF reception. No passwords are displayed.
+There is no desktop, screen mirroring, automatic reboot or downloaded vendor
+installer. The framebuffer is selected by its ILI9486 driver name, not
+an assumed `/dev/fb1`; unsupported layouts fail visibly in the journal.
+
+If blank or rotated incorrectly:
+
+```bash
+sudo journalctl -u loft-display -b
+cat /sys/class/graphics/fb*/name
+```
+
+Change `rotate=90` to `rotate=270` in
+`/boot/firmware/loft-display.txt` for the opposite landscape orientation,
+then reboot. Do not use portrait rotation with this 480x320 dashboard.
+If the framebuffer is missing, check the overlay/kernel logs rather than
+running `LCD35-show`, which can replace unrelated boot settings.
+
+Disable and restore the normal headless receiver:
+
+```bash
+sudo bash ~/loft-sdr-source/pi/display-install.sh --disable
+sudo reboot
+```
+
+The script saves a timestamped `config.txt` backup before changing its
+own include file. It does not alter radio or network settings. A display
+failure does not prevent receiver services starting.
+Rendering and status parsing are software-tested; actual display output
+still requires testing on your board.
+
+## Building the image
 
 On a **dedicated native ARM64 Linux builder**, install curl, xz-utils, util-linux,
 parted and e2fsprogs, then run `sudo bash pi/build.sh` from the repository.

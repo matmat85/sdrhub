@@ -11,6 +11,11 @@ docker run --rm loft/feeder-installer-tests:local
 docker run --rm -e TEST_NO_START=1 loft/feeder-installer-tests:local
 docker run --rm --cap-add NET_ADMIN --entrypoint python3 -v "$ROOT:/release:ro" \
     loft/feeder-installer-tests:local /release/tests/receiver.test.py
+docker run --rm --entrypoint python3 -v "$ROOT:/release:ro" \
+    loft/feeder-installer-tests:local /release/tests/display.test.py
+docker run --rm --entrypoint dtc -v "$ROOT:/release:ro" \
+    loft/feeder-installer-tests:local -@ -I dts -O dtb \
+    -o /tmp/loft-lcd.dtbo /release/pi/loft-lcd-overlay.dts
 docker run --rm --entrypoint node -v "$ROOT:/release:ro" \
     node:22-alpine --test /release/sources/sdr-monitor/tests/remote-device.test.cjs
 bash "$ROOT/sources/sdr-hub/deploy/loft/tests/remote-smoke.test.sh"
