@@ -3,6 +3,7 @@ set -euo pipefail
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 shellcheck -x -P "$ROOT/scripts" -P "$ROOT/pi" "$ROOT/scripts/"*.sh "$ROOT/pi/"*.sh
 python3 "$ROOT/tests/image_archive.test.py"
+bash "$ROOT/tests/pi-image-plan.test.sh"
 docker run --rm --entrypoint bash -v "$ROOT:/release:ro" \
     python:3.12-slim /release/tests/proxmox.test.sh
 bash "$ROOT/tests/permissions.test.sh"

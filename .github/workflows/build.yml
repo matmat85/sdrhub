@@ -6,6 +6,21 @@ on:
 permissions:
   contents: read
 jobs:
+  pi-plan:
+    runs-on: ubuntu-24.04
+    outputs:
+      source: ${{ steps.plan.outputs.source }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          SOURCE=$(bash scripts/pi-image-plan.sh)
+          echo "source=$SOURCE" >> "$GITHUB_OUTPUT"
+          echo "Pi image source: $SOURCE" >> "$GITHUB_STEP_SUMMARY"
   hub:
     runs-on: ubuntu-24.04
     steps:
@@ -25,11 +40,29 @@ jobs:
             dist/hub-image.txt
             dist/hub-image.tar.gz
   pi:
+    needs: pi-plan
     runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v4
-      - run: sudo apt-get update && sudo apt-get install -y parted e2fsprogs xz-utils
-      - run: sudo bash pi/build.sh
+      - if: needs.pi-plan.outputs.source == 'build'
+        run: sudo apt-get update && sudo apt-get install -y parted e2fsprogs xz-utils
+      - if: needs.pi-plan.outputs.source == 'build'
+        run: sudo bash pi/build.sh
+      - name: Reuse verified Pi image
+        if: needs.pi-plan.outputs.source != 'build'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PI_RELEASE: ${{ needs.pi-plan.outputs.source }}
+        run: |
+          mkdir -p dist
+          gh release download "$PI_RELEASE" --repo "$GITHUB_REPOSITORY" \
+            --pattern loft-pi.img.xz --pattern SHA256SUMS --dir dist
+          cd dist
+          awk '$2 == "loft-pi.img.xz" { print }' SHA256SUMS > PI-SHA256SUMS
+          test "$(wc -l < PI-SHA256SUMS)" -eq 1
+          sha256sum --check --strict PI-SHA256SUMS
+          rm SHA256SUMS PI-SHA256SUMS
+          echo "Reused verified Pi image from $PI_RELEASE" >> "$GITHUB_STEP_SUMMARY"
       - run: |
           TAG="${GITHUB_REF_NAME}"
           if [[ "$GITHUB_REF_TYPE" != tag ]]; then TAG=$(cat sources/adsb-feeder-image/release-version); fi

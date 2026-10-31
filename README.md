@@ -129,6 +129,15 @@ after both build jobs succeed. Release assets include `loft-pi.img.xz`,
 `pi-imager.json`, `hub-image.tar.gz`, `hub-image.txt`, `sdrhub-source.tar.gz`,
 `proxmox.sh` and `SHA256SUMS`.
 
+The workflow compares `pi/` and `sources/adsb-feeder-image/` against the most
+recent published version release containing a Pi image and checksums. If those
+image inputs are unchanged (ignoring Pi Markdown documentation), it reuses that release's Pi image after verifying
+its SHA256 checksum, and regenerates the Imager catalogue for the new release.
+LXC-only changes therefore do not rebuild the Pi. Changed image inputs or no
+eligible prior release trigger a native ARM64 build; download/checksum errors
+fail the workflow rather than silently building or accepting another image.
+Existing release tags and running workflows are not modified by this policy.
+
 Follow the [manual deployment guide](sources/sdr-hub/deploy/loft/README.md)
 for Pi services, remote Beast configuration, Docker Compose setup and radio
 controls. It also documents the focused UI and network/audio tests.
