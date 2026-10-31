@@ -4,25 +4,6 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && \
     apt-get install -y --no-install-recommends ca-certificates curl git zip build-essential cmake ccache tzdata libspdlog-dev libliquid-dev nlohmann-json3-dev libgtest-dev libgmock-dev libusb-1.0-0-dev libfftw3-dev libboost-all-dev libsoapysdr-dev gnuradio gnuradio-dev libsndfile1-dev libssl-dev libpaho-mqtt-dev libpaho-mqttpp-dev libcli11-dev
 
-WORKDIR /sdrplay_api
-COPY sdrplay/*.run .
-RUN chmod +x ./SDRplay_RSP_API-Linux-3.15.2.run && \
-    ./SDRplay_RSP_API-Linux-3.15.2.run --tar xvf && \
-    cp -rf inc/sdrplay_api*h /usr/local/include/ && \
-    cp -rf `dpkg --print-architecture`/sdrplay_apiService /usr/local/bin && \
-    cp -rf `dpkg --print-architecture`/libsdrplay_api.so* /usr/local/lib/ && \
-    ln -s /usr/local/lib/libsdrplay_api.so.3.15 /usr/local/lib/libsdrplay_api.so && \
-    chmod 644 /usr/local/include/* && \
-    chmod 644 /usr/local/lib/libsdrplay_api.so* && \
-    ldconfig
-
-WORKDIR /soapy_sdrplay
-RUN --mount=type=cache,target=/root/.cache/ccache,id=ccache \
-    git clone --branch soapy-sdrplay3-0.5.2 https://github.com/pothosware/SoapySDRPlay3.git /soapy_sdrplay && \
-    cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache . && \
-    cmake --build build -j${BUILD_JOBS} && \
-    cmake --install build
-
 WORKDIR /root/auto-sdr/
 ARG SOAPY_RTLTCP_REF=51fac2b88161367514dc72694c14a9efb8bb58e5
 RUN git clone https://github.com/pothosware/SoapyRTLTCP.git /soapy_rtltcp && \
@@ -62,9 +43,6 @@ CMD ["/usr/bin/auto_sdr_test"]
 FROM run
 RUN mkdir -p /app && \
     mkdir -p /config
-COPY --from=build /usr/local/lib/libsdrplay_api.so* /usr/local/lib/
-COPY --from=build /usr/local/bin/sdrplay_apiService /usr/local/bin/
-COPY --from=build /usr/local/lib/SoapySDR/modules0.8/libsdrPlaySupport.so /usr/local/lib/SoapySDR/modules0.8/
 COPY --from=build /usr/local/lib/SoapySDR/modules0.8/librtltcpSupport.so /usr/local/lib/SoapySDR/modules0.8/
 COPY --from=build_release /root/auto-sdr/build/auto_sdr /usr/bin/auto_sdr
 COPY --from=build_debug /root/auto-sdr/build/auto_sdr /usr/bin/auto_sdr.debug

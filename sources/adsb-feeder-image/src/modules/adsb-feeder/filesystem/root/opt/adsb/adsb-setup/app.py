@@ -50,6 +50,7 @@ from flask import (
 from flask.logging import logging as flask_logging  # pyright: ignore[reportPrivateImportUsage]
 from utils.agg_status import AggStatus, Healthcheck, ImStatus
 from utils.auth import WebAuth
+from utils.loft_receiver import read_config as read_loft_config, register_receiver
 from utils.background import Background
 from utils.config import (
     config_lock,
@@ -373,6 +374,7 @@ class AdsbIm:
         self.app.add_url_rule("/restore", "restore", self.restore, methods=["GET", "POST"])
         self.app.add_url_rule("/executerestore", "executerestore", self.executerestore, methods=["GET", "POST"])
         self.app.add_url_rule("/sdr_setup", "sdr_setup", self.sdr_setup, methods=["GET", "POST"])
+        register_receiver(self.app, self._auth, self._sdrdevices)
         self.app.add_url_rule("/visualization", "visualization", self.visualization, methods=["GET", "POST"])
         self.app.add_url_rule("/advanced", "advanced", self.advanced, methods=["GET", "POST"])
         self.app.add_url_rule("/expert", "expert", self.expert, methods=["GET", "POST"])
@@ -1533,6 +1535,15 @@ class AdsbIm:
             print_err(f"sdr_config: got {sdr_data_list} and not a list")
             return
         print_err(f"sdr_config: got {sdr_data_list}")
+        loft_config = read_loft_config()
+        if loft_config and any(
+            sdr_data.get("serial") == loft_config["serial"]
+            and sdr_data.get("purpose") not in ("", None)
+            for sdr_data in sdr_data_list
+        ):
+            flash("This dongle is reserved for RTL-TCP. Change the Loft receiver configuration before assigning it to a decoder.")
+            print_err("Rejected conflicting assignment of the Loft RTL-TCP dongle")
+            return
         for sdr_data in sdr_data_list:
             sdr = self._sdrdevices.get_sdr_by_serial(sdr_data.get("serial"))
             if sdr is not self._sdrdevices.null_sdr:

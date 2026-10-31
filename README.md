@@ -5,14 +5,14 @@ running in separate Docker-enabled Proxmox LXCs.
 
 ## Status
 
-Development source, not a ready-to-flash release. Remote SDR support and the
-FM/DAB interface have been built and exercised with network/audio integration
-tests. A custom Pi image, first-boot provisioning, Pi setup UI extensions and
-release automation are still unfinished. The Proxmox installer is experimental:
-do not run it until a tested release and its required assets are published.
+The repository includes a native ARM64 Pi image builder, first-boot provisioning,
+authenticated receiver setup, a source-only SDR Hub Docker build and a Proxmox
+installer. GitHub Actions builds and tests both image artifacts and publishes
+tagged prereleases with checksums. Check the latest workflow result before
+downloading a release.
 
-No Pi image or production-ready one-line installer is currently available.
-Physical Pi boot, real DAB audio and deployment on Proxmox remain unverified.
+Physical Pi boot, real DAB audio and actual Proxmox installation remain
+unverified. Releases are explicitly marked prerelease until hardware testing.
 
 ## Architecture
 
@@ -35,14 +35,9 @@ LAN and restrict access to the intended LXC addresses. Do not port-forward them.
 ## Build and manual setup
 
 The edited upstream sources, including licenses and tests, are in
-[sources](sources). The inherited scanner Dockerfile also requires
-`SDRplay_RSP_API-Linux-3.15.2.run` in
-`sources/rtl-sdr-scanner-cpp/sdrplay/`. This proprietary SDK is intentionally
-not redistributed here; obtain it from SDRplay under their license before
-using the current Dockerfile. Removing that unnecessary dependency for our
-RTL-SDR-only release is still pending.
-
-On Linux with Docker installed and that build prerequisite available:
+[sources](sources). The scanner and combined hub no longer depend on the
+proprietary SDRplay SDK: this distribution targets RTL-SDR/RTL-TCP, not SDRplay.
+On Linux with Docker installed:
 
 ```bash
 bash sources/sdr-hub/deploy/loft/build.sh
@@ -50,6 +45,50 @@ bash sources/sdr-hub/deploy/loft/build.sh
 
 This builds the scanner, monitor overlay and combined `loft/sdr-hub:local`
 image, and runs the scanner's device-argument regression tests.
+
+## Install a built release
+
+1. Flash the Pi image and configure Wi-Fi, your OS account and both radios
+   using the [Pi setup guide](pi/README.md).
+2. On a Proxmox VE 9 **host** as root, download and inspect the release installer:
+
+   ```bash
+   curl -fL https://github.com/matmat85/sdrhub/releases/download/v0.1.0/proxmox.sh -o /root/loft-proxmox.sh
+   less /root/loft-proxmox.sh
+   bash /root/loft-proxmox.sh
+   ```
+
+   It prompts for the Pi address, storage, bridge and two fresh CT IDs, then
+   requires explicit `CREATE` confirmation. It creates two unprivileged Debian
+   13 LXCs with nesting enabled, downloads checksum-verified source and Docker
+   image archives, installs software and prints unique login credentials.
+   No GitHub/registry account is required. Existing CTs/VMs are not overwritten.
+   Failed new CTs are retained for diagnosis, not automatically destroyed.
+
+3. Reserve both LXC DHCP addresses. Update the Pi receiver page with those
+   addresses so its firewall permits their connections.
+4. Finish location and aggregator setup on the ADS-B LXC. Remote Beast input
+   is already configured. On SDR Hub, set location and legal scan ranges;
+   **Live radio** provides FM/DAB tuning, listening and resume-scanning controls.
+
+The distribution is one flashable Pi image plus two LXC installations, not
+three interchangeable OS images. Docker runs only inside LXCs, never directly
+on the Proxmox host. The release includes a compressed Docker image archive so
+installation does not depend on private GHCR package visibility.
+
+## Validation and releases
+
+After building the hub, run `bash scripts/test.sh` with Docker and ShellCheck.
+It checks both feeder installation modes, receiver authentication/CSRF and
+exclusive serial assignments, Proxmox command generation/checksum rejection,
+remote-device UI regression and live network/FM/DAB-decoder integration.
+The ARM image job checks the official Raspberry Pi OS base checksum.
+
+Use **Actions -> Build loft receiver release -> Run workflow** for development
+artifacts. A version tag such as `v0.1.0` publishes the complete release only
+after both build jobs succeed. Release assets include `loft-pi.img.xz`,
+`pi-imager.json`, `hub-image.tar.gz`, `hub-image.txt`, `sdrhub-source.tar.gz`,
+`proxmox.sh` and `SHA256SUMS`.
 
 Follow the [manual deployment guide](sources/sdr-hub/deploy/loft/README.md)
 for Pi services, remote Beast configuration, Docker Compose setup and radio

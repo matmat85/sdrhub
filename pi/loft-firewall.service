@@ -1,0 +1,12 @@
+[Unit]
+Description=Restrict loft SDR receiver ports to configured LXC clients
+After=network-pre.target
+Before=loft-rtl-tcp.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /usr/local/lib/loft/receiver.py --firewall
+RemainAfterExit=true
+
+[Install]
+WantedBy=multi-user.target

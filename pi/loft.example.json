@@ -1,0 +1,9 @@
+{
+  "web_password": "REPLACE_WITH_A_UNIQUE_PASSWORD_AT_LEAST_12_CHARACTERS",
+  "receiver": {
+    "serial": "77465553",
+    "listen": "192.168.1.50",
+    "hub_client": "192.168.1.52",
+    "adsb_client": "192.168.1.51"
+  }
+}

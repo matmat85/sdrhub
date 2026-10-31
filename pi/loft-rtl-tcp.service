@@ -1,0 +1,21 @@
+[Unit]
+Description=Loft second RTL-SDR sample server
+After=network-online.target loft-firewall.service
+Wants=network-online.target
+Requires=loft-firewall.service
+ConditionPathExists=/etc/loft-receiver/radio.json
+
+[Service]
+User=loft-radio
+SupplementaryGroups=plugdev
+ExecStartPre=+/usr/bin/python3 /usr/local/lib/loft/receiver.py --check-assignment
+ExecStart=/usr/bin/python3 /usr/local/lib/loft/receiver.py
+Restart=on-failure
+RestartSec=10
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

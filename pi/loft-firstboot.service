@@ -1,0 +1,12 @@
+[Unit]
+Description=Provision unique loft receiver web credentials
+Before=adsb-setup.service adsb-docker.service loft-firewall.service loft-rtl-tcp.service
+ConditionPathExists=!/etc/loft-receiver/provisioned
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /usr/local/lib/loft/firstboot.py
+RemainAfterExit=true
+
+[Install]
+WantedBy=multi-user.target

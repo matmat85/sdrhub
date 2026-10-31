@@ -1,0 +1,66 @@
+name: Build loft receiver release
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+jobs:
+  hub:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y shellcheck jq
+      - run: bash sources/sdr-hub/deploy/loft/build.sh
+      - run: bash scripts/test.sh
+      - name: Package container without requiring registry authentication
+        run: |
+          mkdir -p dist
+          docker image inspect loft/sdr-hub:local --format '{{.Id}}' > dist/hub-image.txt
+          docker save loft/sdr-hub:local | gzip -1 > dist/hub-image.tar.gz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hub-image
+          path: |
+            dist/hub-image.txt
+            dist/hub-image.tar.gz
+  pi:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y parted e2fsprogs xz-utils
+      - run: sudo bash pi/build.sh
+      - run: |
+          TAG="${GITHUB_REF_NAME}"
+          if [[ "$GITHUB_REF_TYPE" != tag ]]; then TAG=v0.1.0; fi
+          python3 scripts/catalogue.py "$TAG"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pi-image
+          path: |
+            dist/loft-pi.img.xz
+            dist/pi-imager.json
+  release:
+    needs: [hub, pi]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - run: bash scripts/package.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-bundle
+          path: dist/*
+      - name: Publish prerelease
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* --prerelease \
+            --title "Loft SDR $GITHUB_REF_NAME" \
+            --notes "Built receiver image and SDR Hub container. Physical Pi boot, Wi-Fi/DAB reception and Proxmox host installation still require hardware verification. See README for setup."

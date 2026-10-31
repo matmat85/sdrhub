@@ -12,7 +12,11 @@ for args in "-l" "-l /source -b main" "-l /source -t test" "-l /source -s /tmp" 
     fi
     [[ ! -d /opt/adsb ]] || { echo "FAIL: invalid arguments created an installation" >&2; exit 1; }
 done
-bash "$INSTALLER" -l /source
+if [[ "${TEST_NO_START:-0}" == 1 ]]; then
+    bash "$INSTALLER" -l /source -n
+else
+    bash "$INSTALLER" -l /source
+fi
 [[ -f /opt/adsb/adsb-setup/app.py ]]
 [[ -f /opt/adsb/app.adsb.feeder.image ]]
 [[ -f /usr/lib/systemd/system/adsb-setup.service ]]
@@ -20,5 +24,13 @@ bash "$INSTALLER" -l /source
 cmp /source/src/modules/adsb-feeder/filesystem/root/opt/adsb/docker-compose.yml /opt/adsb/docker-compose.yml
 after=$(find /source -type f -not -path '*/.git/*' -exec sha256sum {} + | sort | sha256sum)
 [[ "$before" == "$after" ]] || { echo "FAIL: installer modified its source checkout" >&2; exit 1; }
-grep -q 'enable --now' /tmp/installer-services.log
+if [[ "${TEST_NO_START:-0}" == 1 ]]; then
+    grep -q 'enable ' /tmp/installer-services.log
+    if grep -q 'enable --now' /tmp/installer-services.log; then
+        echo "FAIL: -n started services" >&2
+        exit 1
+    fi
+else
+    grep -q 'enable --now' /tmp/installer-services.log
+fi
 echo "PASS: local install preserves the source checkout and installs its files and services"

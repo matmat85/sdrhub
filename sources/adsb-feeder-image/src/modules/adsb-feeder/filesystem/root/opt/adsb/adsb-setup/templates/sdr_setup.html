@@ -4,6 +4,9 @@
 <h1 class="mt-3 text-center text-danger">
   {% block title %}SDR Setup{% endblock %}
 </h1>
+{% if loft_receiver_available %}
+<p><a href="/loft_receiver">Loft RTL-TCP receiver settings</a> (custom Pi image only)</p>
+{% endif %}
   <div>
     {% with messages = get_flashed_messages() %}
     {% if messages %}

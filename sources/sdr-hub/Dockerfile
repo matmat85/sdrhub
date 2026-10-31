@@ -38,9 +38,6 @@ RUN apt-get update && \
 COPY --from=scanner /sdr_scanner_* /
 COPY --from=scanner /usr/bin/auto_sdr /usr/bin/auto_sdr
 COPY --from=scanner /usr/bin/auto_sdr.debug /usr/bin/auto_sdr.debug
-COPY --from=scanner /usr/local/bin/sdrplay_apiService /usr/local/bin/
-COPY --from=scanner /usr/local/lib/libsdrplay_api.so* /usr/local/lib/
-COPY --from=scanner /usr/local/lib/SoapySDR/modules0.8/libsdrPlaySupport.so /usr/local/lib/SoapySDR/modules0.8/
 COPY --from=scanner /usr/local/lib/SoapySDR/modules0.8/librtltcpSupport.so /usr/local/lib/SoapySDR/modules0.8/
 
 COPY config/supervisord.conf /etc/supervisor/conf.d/supervisord.conf

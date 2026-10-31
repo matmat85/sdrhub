@@ -192,7 +192,12 @@ fi
 # determine the version
 SRC_ROOT="${CHECKOUT_DIR}/src/modules/adsb-feeder/filesystem/root"
 cd "$SRC_ROOT" || exit_message "can't cd to $SRC_ROOT"
-ADSB_IM_VERSION=$(bash "${CHECKOUT_DIR}/src/get_version.sh")
+if [[ -f "${CHECKOUT_DIR}/release-version" ]]; then
+    ADSB_IM_VERSION=$(<"${CHECKOUT_DIR}/release-version")
+    [[ "$ADSB_IM_VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?$ ]] || exit_message "Invalid exported release version"
+else
+    ADSB_IM_VERSION=$(bash "${CHECKOUT_DIR}/src/get_version.sh") || exit_message "Cannot determine source version"
+fi
 
 # copy the software in place
 cp -a "${SRC_ROOT}/opt/adsb/"* "${APP_DIR}/" || exit_message "cannot install application files"

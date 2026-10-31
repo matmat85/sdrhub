@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1 class="mt-3">Loft receiver</h1>
+{% for message in get_flashed_messages() %}
+<div class="alert alert-warning">{{ message }}</div>
+{% endfor %}
+<p>Keep the ADS-B dongle assigned to 1090 in <a href="/sdr_setup">SDR Setup</a>.
+Leave the second dongle unassigned there; this page owns it for RTL-TCP.</p>
+<p>Reserve the Pi and both LXC addresses in your router before configuring.
+Only the listed clients can connect to TCP 1234 and 30005. Do not expose these ports to the Internet.</p>
+<form method="post">
+<input type="hidden" name="csrf" value="{{ session['loft_csrf'] }}">
+{% for key, label in [('serial', 'Streaming dongle serial'), ('listen', 'Pi LAN IPv4 address'), ('hub_client', 'SDR Hub LXC IPv4 address'), ('adsb_client', 'ADS-B LXC IPv4 address')] %}
+<label class="form-label mt-3" for="{{ key }}">{{ label }}</label>
+<input class="form-control" id="{{ key }}" name="{{ key }}" value="{{ settings[key] }}" required>
+{% endfor %}
+<button class="btn btn-primary mt-3" type="submit">Apply receiver settings</button>
+</form>
+<p class="mt-3">Endpoint: {{ settings['listen'] }}:1234. Beast: {{ settings['listen'] }}:30005.
+FM/scanning need about 16.4 Mbps; DAB needs about 32.8 Mbps plus overhead.
+USB bias tees are disabled.</p>
+{% endblock %}

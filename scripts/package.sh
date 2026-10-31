@@ -11,5 +11,5 @@ tar -czf "$ROOT/dist/sdrhub-source.tar.gz" -C "$ROOT" \
 cp "$ROOT/scripts/proxmox.sh" "$ROOT/dist/proxmox.sh"
 (
     cd "$ROOT/dist"
-    sha256sum sdrhub-source.tar.gz proxmox.sh > SHA256SUMS
+    sha256sum sdrhub-source.tar.gz proxmox.sh hub-image.txt hub-image.tar.gz loft-pi.img.xz pi-imager.json > SHA256SUMS
 )
