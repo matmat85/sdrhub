@@ -52,8 +52,27 @@ pveam() {
     if [[ "$1" == available ]]; then echo 'system debian-13-standard_13.0-1_amd64.tar.zst'; fi
 }
 pct() {
-    if [[ "$1" == config ]]; then return 1; fi
+    if [[ "$1" == config ]]; then
+        local marker
+        if [[ "${CONFIG_FAIL_ID:-}" == "$2" ]]; then return 1; fi
+        marker=$(awk -v id="$2" '$1=="create" && $2==id {
+            for(i=1;i<NF;i++) if($i=="--description") {print $(i+1); exit}
+        }' "$CALLS")
+        [[ -n "$marker" ]] || return 1
+        if [[ "${FOREIGN_ID:-}" == "$2" ]]; then marker=unrelated-container; fi
+        printf 'description: %s\n' "$marker"
+        return 0
+    fi
     printf '%s\n' "$*" >> "$CALLS"
+    if [[ "$1" == status ]]; then
+        if [[ "${STATUS_FAIL_ID:-}" == "$2" ]]; then return 1; fi
+        printf 'status: %s\n' "${CT_STATE:-running}"
+    fi
+    if [[ "$1" == "${FAIL_COMMAND:-}" && "$2" == "${FAIL_ID:-}" ]]; then return 1; fi
+    if [[ "$1" == "${SIGNAL_COMMAND:-}" ]]; then kill -s TERM "$BASHPID"; fi
+    if [[ "$1" == stop && "$2" == "${STOP_FAIL_ID:-}" ]]; then return 1; fi
+    if [[ "$1" == destroy && "$2" == "${DESTROY_FAIL_ID:-}" ]]; then return 1; fi
+    return 0
 }
 curl() {
     local url="" target=""
@@ -97,8 +116,49 @@ fi
 if ( list_bridges() { return 0; }; recommended_bridge ); then
     echo "Missing bridge accepted" >&2; exit 1
 fi
+run_failure() {
+    local status
+    : > "$CALLS"
+    # Do not put main in an if condition: Bash would disable errexit inside it.
+    set +e
+    ( set -e; main )
+    status=$?
+    set -e
+    [[ "$status" != 0 ]] || { echo "Installation failure accepted" >&2; exit 1; }
+}
+FAIL_COMMAND=start FAIL_ID=103 run_failure
+grep -q '^destroy 103$' "$CALLS"
+[[ $(grep -c '^create ' "$CALLS") == 1 ]]
+FAIL_COMMAND=exec FAIL_ID=104 run_failure
+[[ $(grep -c '^destroy ' "$CALLS") == 2 ]]
+[[ $(grep '^destroy ' "$CALLS") == $'destroy 104\ndestroy 103' ]]
+FAIL_COMMAND=create FAIL_ID=104 CT_STATE=stopped run_failure
+[[ $(grep -c '^destroy ' "$CALLS") == 2 ]]
+if grep -q '^stop ' "$CALLS"; then echo "Stopped CT stopped again" >&2; exit 1; fi
+FAIL_COMMAND=push FAIL_ID=104 FOREIGN_ID=104 run_failure
+grep -q '^destroy 103$' "$CALLS"
+if grep -Eq '^(stop|destroy) 104$' "$CALLS"; then echo "Foreign CT modified" >&2; exit 1; fi
+FAIL_COMMAND=exec FAIL_ID=104 CONFIG_FAIL_ID=104 run_failure
+grep -q '^destroy 103$' "$CALLS"
+if grep -Eq '^(stop|destroy) 104$' "$CALLS"; then echo "Unverified CT modified" >&2; exit 1; fi
+FAIL_COMMAND=exec FAIL_ID=104 STATUS_FAIL_ID=104 run_failure
+grep -q '^destroy 103$' "$CALLS"
+if grep -Eq '^(stop|destroy) 104$' "$CALLS"; then echo "CT with unknown status modified" >&2; exit 1; fi
+FAIL_COMMAND=exec FAIL_ID=104 STOP_FAIL_ID=104 run_failure
+grep -q '^destroy 103$' "$CALLS"
+if grep -q '^destroy 104$' "$CALLS"; then echo "CT destroyed after failed stop" >&2; exit 1; fi
+FAIL_COMMAND=exec FAIL_ID=104 DESTROY_FAIL_ID=104 run_failure
+[[ $(grep -c '^destroy ' "$CALLS") == 2 ]]
+SIGNAL_COMMAND=push run_failure
+grep -q '^destroy 103$' "$CALLS"
+(
+    exec {TEST_LOCK}>/run/lock/loft-proxmox.lock
+    flock -n "$TEST_LOCK"
+    run_failure
+    [[ ! -s "$CALLS" ]]
+)
 printf 'corrupt\n' > "$TMP/hub-image.tar.gz"
 : > "$CALLS"
 if ( main ); then echo "Checksum mismatch accepted" >&2; exit 1; fi
 [[ ! -s "$CALLS" ]]
-echo "PASS: detected defaults, cluster-wide IDs, overrides, missing-resource rejection and verified image transfer"
+echo "PASS: defaults, cluster IDs, checksums, rollback, ownership protection, cleanup failures, signals and locking"

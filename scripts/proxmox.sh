@@ -69,12 +69,68 @@ confirm_create() {
     read -r -p "Type CREATE to continue: " confirm </dev/tty
     [[ "$confirm" == CREATE ]] || fail "Cancelled"
 }
+finish_install() {
+    local status=$1 id config state cleanup_failed=0 index
+    trap - EXIT INT TERM
+    if [[ "$INSTALL_COMPLETE" != true ]]; then
+        (( status != 0 )) || status=1
+        echo "Installation failed; rolling back only CTs owned by this run." >&2
+        for ((index=${#INSTALL_IDS[@]}-1; index>=0; index--)); do
+            id=${INSTALL_IDS[index]}
+            if ! config=$(pct config "$id"); then
+                echo "WARNING: Cannot inspect CT $id; no deletion attempted. Check pct list." >&2
+                cleanup_failed=1
+                continue
+            fi
+            if ! grep -Fxq "description: $INSTALL_MARKER" <<< "$config"; then
+                echo "WARNING: CT $id ownership marker does not match; leaving it untouched." >&2
+                cleanup_failed=1
+                continue
+            fi
+            if ! state=$(pct status "$id"); then
+                echo "WARNING: Cannot query CT $id status; leaving it untouched." >&2
+                cleanup_failed=1
+                continue
+            fi
+            case "$state" in
+                "status: running")
+                    if ! pct stop "$id"; then
+                        echo "WARNING: Cannot stop CT $id; no deletion attempted." >&2
+                        cleanup_failed=1
+                        continue
+                    fi ;;
+                "status: stopped") ;;
+                *)
+                    echo "WARNING: Unexpected CT $id status; no deletion attempted: $state" >&2
+                    cleanup_failed=1
+                    continue ;;
+            esac
+            if ! pct destroy "$id"; then
+                echo "WARNING: Cannot remove failed CT $id; inspect it manually." >&2
+                cleanup_failed=1
+            else
+                echo "Removed failed-install CT $id." >&2
+            fi
+        done
+        if (( cleanup_failed )); then
+            echo "WARNING: Rollback incomplete. Inspect the reported IDs before retrying; never delete an unverified CT." >&2
+        fi
+    fi
+    if ! rm -f "$WORK/sdrhub-source.tar.gz" "$WORK/SHA256SUMS" "$WORK/hub-image.txt" "$WORK/hub-image.tar.gz" ||
+        ! rmdir "$WORK"; then
+        echo "WARNING: Cannot fully remove installer temporary files in $WORK." >&2
+        (( status != 0 )) || status=1
+    fi
+    exit "$status"
+}
 main() {
     [[ $EUID == 0 ]] || fail "Run this on the Proxmox host as root"
-    for cmd in pct pveversion pveam pvesm pvesh python3 curl sha256sum tar ip; do
+    for cmd in pct pveversion pveam pvesm pvesh python3 curl sha256sum tar ip flock; do
         command -v "$cmd" >/dev/null || fail "Missing Proxmox prerequisite: $cmd"
     done
     [[ $(pveversion) == pve-manager/9.* ]] || fail "This installer targets Proxmox VE 9"
+    exec {INSTALL_LOCK}>/run/lock/loft-proxmox.lock
+    flock -n "$INSTALL_LOCK" || fail "Another loft installer is running on this host"
     prompt TAG "Published release tag (not a branch)" v0.1.1
     [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "Use a version tag such as v0.1.0"
     prompt PI "Pi's reserved LAN IPv4 address" ""
@@ -122,11 +178,16 @@ main() {
     echo "  Container storage: $STORAGE; template storage: $TEMPLATE_STORAGE"
     echo "  Release: $TAG; Pi: $PI (Beast 30005, RTL-TCP 1234)"
     echo "The Pi will not be modified. No USB passthrough, host Docker or privileged fallback."
+    echo "If either installation fails, only CTs marked as owned by this run will be removed."
     confirm_create
 
     WORK=$(mktemp -d -t sdrhub-install.XXXXXXXX)
-    trap 'rm -f "$WORK/sdrhub-source.tar.gz" "$WORK/SHA256SUMS" "$WORK/hub-image.txt" "$WORK/hub-image.tar.gz"; rmdir "$WORK" 2>/dev/null || true' EXIT
-    trap 'echo "Installation failed. Created CTs are retained for diagnosis; inspect them with pct list. No existing CT was removed." >&2' ERR
+    INSTALL_IDS=()
+    INSTALL_MARKER="loft-install:${WORK##*/}"
+    INSTALL_COMPLETE=false
+    trap 'finish_install "$?"' EXIT
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
     local base="https://github.com/$REPOSITORY/releases/download/$TAG"
     for asset in sdrhub-source.tar.gz SHA256SUMS hub-image.txt hub-image.tar.gz; do
         curl --fail --location --proto '=https' "$base/$asset" -o "$WORK/$asset"
@@ -151,7 +212,10 @@ main() {
         else id=$HUB_ID; memory=4096; disk=24; fi
         pvesh get /cluster/nextid --vmid "$id" --output-format json >/dev/null ||
             fail "VM/CT ID $id was claimed while downloading; choose another ID and retry"
+        # Track partial creates too, but delete only if the unique marker is present.
+        INSTALL_IDS+=("$id")
         pct create "$id" "$TEMPLATE_STORAGE:vztmpl/$template" --hostname "loft-$role" \
+            --description "$INSTALL_MARKER" \
             --ostype debian --unprivileged 1 --features nesting=1,keyctl=1 \
             --cores 2 --memory "$memory" --swap 512 --rootfs "$STORAGE:$disk" \
             --net0 "name=eth0,bridge=$BRIDGE,ip=dhcp,type=veth" --onboot 1
@@ -162,5 +226,6 @@ main() {
         pct exec "$id" -- bash /opt/loft-release/scripts/lxc-install.sh "$role" "$PI" "$image"
     done
     echo "Both LXCs installed. Reserve their DHCP addresses and restrict Pi ports 1234/30005 to these hosts."
+    INSTALL_COMPLETE=true
 }
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then main "$@"; fi
