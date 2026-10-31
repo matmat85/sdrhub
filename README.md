@@ -58,6 +58,24 @@ image, and runs the scanner's device-argument regression tests.
    bash /root/loft-proxmox.sh
    ```
 
+   For the enhanced installer with autodetected defaults, use the current
+   source version instead (it still installs the built `v0.1.1` release):
+
+   ```bash
+   curl -fL https://raw.githubusercontent.com/matmat85/sdrhub/main/scripts/proxmox.sh -o /root/loft-proxmox.sh
+   less /root/loft-proxmox.sh
+   bash /root/loft-proxmox.sh
+   ```
+
+   The enhanced installer always asks for the Pi address. It recommends the
+   default-route bridge, then `vmbr0`, then the first available bridge; prefer
+   a bridge on the Pi's LAN and override the recommendation if necessary.
+   It prefers active `local-lvm` disk storage and `local` template storage
+   when supported, otherwise the eligible pool with most free space.
+   It suggests two IDs unused across the whole cluster, including VMs on
+   other nodes. Every recommendation can be overridden, and entered IDs are
+   checked again against the cluster. Network configuration remains DHCP.
+
    It prompts for the Pi address, storage, bridge and two fresh CT IDs, then
    requires explicit `CREATE` confirmation. It creates two unprivileged Debian
    13 LXCs with nesting enabled, downloads checksum-verified source and Docker

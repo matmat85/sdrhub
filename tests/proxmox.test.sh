@@ -20,20 +20,34 @@ printf 'sha256:%064d\n' 0 > "$TMP/hub-image.txt"
 )
 prompt() {
     case "$1" in
-        TAG) TAG=v0.1.0 ;;
+        TAG) TAG=v0.1.1 ;;
         PI) PI=192.168.1.50 ;;
-        BRIDGE) BRIDGE=vmbr0 ;;
-        STORAGE) STORAGE=local-lvm ;;
-        TEMPLATE_STORAGE) TEMPLATE_STORAGE=local ;;
-        ADSB_ID) ADSB_ID=120 ;;
-        HUB_ID) HUB_ID=121 ;;
+        ADSB_ID) ADSB_ID=${OVERRIDE_ADSB:-$3} ;;
+        *) printf -v "$1" '%s' "$3" ;;
     esac
 }
 confirm_create() { return 0; }
-bridge_exists() { return 0; }
+bridge_exists() { [[ "$1" == vmbr0 || "$1" == vmbr9 ]]; }
+list_bridges() { printf 'vmbr0\nvmbr9\n'; }
 pveversion() { echo pve-manager/9.2.20; }
-ip() { return 0; }
-pvesm() { printf 'Name Type Status\nlocal dir active\n'; }
+ip() { echo 'default via 192.168.1.1 dev vmbr9 proto kernel'; }
+pvesm() {
+    if [[ "$*" == *vztmpl* ]]; then
+        printf 'Name Type Status Total Used Available %%\nlocal dir active 1000 100 900 10%%\n'
+    else
+        printf 'Name Type Status Total Used Available %%\nlocal-lvm lvmthin active 1000 100 900 10%%\n'
+    fi
+}
+pvesh() {
+    case "$2" in
+        /cluster/resources)
+            echo '[{"vmid":100,"type":"qemu","node":"remote"},{"vmid":101,"type":"lxc"},{"vmid":102,"type":"qemu"}]' ;;
+        /cluster/nextid)
+            [[ "$4" -ge 103 ]] || return 1
+            printf '%s\n' "$4" ;;
+        *) return 1 ;;
+    esac
+}
 pveam() {
     if [[ "$1" == available ]]; then echo 'system debian-13-standard_13.0-1_amd64.tar.zst'; fi
 }
@@ -56,13 +70,35 @@ curl() {
 }
 ( main )
 [[ $(grep -c '^create ' "$CALLS") == 2 ]]
-grep -q 'create 120 .*--unprivileged 1.*nesting=1,keyctl=1' "$CALLS"
-grep -q 'create 121 .*--memory 4096' "$CALLS"
-grep -q 'exec 120 -- bash /opt/loft-release/scripts/lxc-install.sh adsb 192.168.1.50 sha256:' "$CALLS"
-grep -q 'push 121 .*hub-image.tar.gz /root/hub-image.tar.gz' "$CALLS"
+grep -q 'create 103 .*--unprivileged 1.*nesting=1,keyctl=1' "$CALLS"
+grep -q 'create 104 .*--memory 4096.*--rootfs local-lvm:24.*bridge=vmbr9' "$CALLS"
+grep -q 'exec 103 -- bash /opt/loft-release/scripts/lxc-install.sh adsb 192.168.1.50 sha256:' "$CALLS"
+grep -q 'push 104 .*hub-image.tar.gz /root/hub-image.tar.gz' "$CALLS"
 if grep -Eq 'destroy|delete|--unprivileged 0' "$CALLS"; then exit 1; fi
+: > "$CALLS"
+( OVERRIDE_ADSB=104; main )
+grep -q '^create 104 ' "$CALLS"
+grep -q '^create 103 ' "$CALLS"
+: > "$CALLS"
+if ( OVERRIDE_ADSB=100; main ); then echo "Occupied cluster ID accepted" >&2; exit 1; fi
+[[ ! -s "$CALLS" ]]
+[[ $(recommended_storage $'Name Type Status Total Used Available\nsmall zfs active 1000 800 200\nlarge zfs active 10000 500 9500\nlocal-lvm lvmthin inactive 10000 0 10000' local-lvm) == large ]]
+[[ $(recommended_storage $'Name Type Status Total Used Available\nlarge zfs active 10000 500 9500\nlocal-lvm lvmthin active 1000 100 900' local-lvm) == local-lvm ]]
+if recommended_storage $'Name Type Status Total Used Available\nlocal dir inactive 1000 100 900' local; then
+    echo "Inactive storage recommended" >&2; exit 1
+fi
+(
+    ip() { echo 'default via 192.168.1.1 dev eno1'; }
+    [[ $(recommended_bridge) == vmbr0 ]]
+    # shellcheck disable=SC2329
+    list_bridges() { echo vmbr2; }
+    [[ $(recommended_bridge) == vmbr2 ]]
+)
+if ( list_bridges() { return 0; }; recommended_bridge ); then
+    echo "Missing bridge accepted" >&2; exit 1
+fi
 printf 'corrupt\n' > "$TMP/hub-image.tar.gz"
 : > "$CALLS"
 if ( main ); then echo "Checksum mismatch accepted" >&2; exit 1; fi
 [[ ! -s "$CALLS" ]]
-echo "PASS: two unprivileged LXCs, release image transfer and checksum failure before creation"
+echo "PASS: detected defaults, cluster-wide IDs, overrides, missing-resource rejection and verified image transfer"
