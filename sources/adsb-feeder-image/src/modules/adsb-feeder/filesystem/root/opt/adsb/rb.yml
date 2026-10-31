@@ -1,0 +1,33 @@
+services:
+  rbfeeder:
+    image: ${RB_CONTAINER}
+    healthcheck:
+      disable: true
+    container_name: rbfeeder
+    hostname: rbfeeder
+    restart: unless-stopped
+    networks:
+      - adsb_im_bridge
+    cpu_period: 50000
+    cpu_quota: 7500
+    stop_grace_period: 3s
+    environment:
+      - BEASTHOST=ultrafeeder
+      - UAT_RECEIVER_HOST=${FEEDER_UAT978_HOST}
+      - LAT=${FEEDER_LAT}
+      - LONG=${FEEDER_LONG}
+      - ALT=${FEEDER_ALT_M}
+      - TZ=${FEEDER_TZ}
+      - SHARING_KEY=${FEEDER_RADARBOX_SHARING_KEY}
+      - S6_KILL_GRACETIME=1000
+      - MLAT_RESULTS_BEASTHOST=ultrafeeder
+      - MLAT_RESULTS_BEASTPORT=31004
+      - ENABLE_MLAT=${MLAT_ENABLE}
+      # USER_PROVIDED_ENV_START
+      # USER_PROVIDED_ENV_END
+    tmpfs:
+      - /run:exec,size=64M
+      - /var/log
+    volumes:
+      - /opt/adsb/rb:${FEEDER_RB_THERMAL_HACK:-/tmp/rbt}:ro
+      - /opt/adsb/rb/cpuinfo:/proc/cpuinfo:ro

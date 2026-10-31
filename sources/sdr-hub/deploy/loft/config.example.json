@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "devices": [
+    {
+      "serial": "77465553",
+      "driver": "rtltcp",
+      "device_args": {
+        "driver": "rtltcp",
+        "rtltcp": "192.168.1.50:1234"
+      },
+      "alias": "loft-scanner",
+      "enabled": true,
+      "sample_rate": 1024000,
+      "ranges": [
+        { "start": 144000000, "stop": 146000000 }
+      ],
+      "gains": [],
+      "start_recording_level": 12,
+      "stop_recording_level": 8,
+      "satellites": [],
+      "crontabs": []
+    }
+  ],
+  "ignored_frequencies": [],
+  "output": {
+    "color_log_enabled": true,
+    "console_log_level": "info",
+    "file_log_level": "debug"
+  },
+  "position": { "latitude": "0.000000", "longitude": "0.000000", "altitude": 0 },
+  "recording": {
+    "min_sample_rate": 32000,
+    "min_time_ms": 2000,
+    "max_noise_time_ms": 2000,
+    "step": 2500
+  },
+  "workers": 2
+}

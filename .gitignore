@@ -1,0 +1,6 @@
+dist/
+build/
+*.env
+__pycache__/
+*.pyc
+sources/rtl-sdr-scanner-cpp/sdrplay/*.run

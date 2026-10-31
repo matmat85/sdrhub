@@ -1,0 +1,104 @@
+#!/bin/bash
+
+# set up the right config files and then pass the arguments
+# on to docker compose
+
+# this needs to run as root
+if [ "$(id -u)" != "0" ] ; then
+    echo "this command requires superuser privileges - please run as sudo bash $0"
+    exit 1
+fi
+
+# identify the calling process for better log messages
+PARENTPID=$(ps -cp $$ -o ppid="")
+if kill -0 "$PARENTPID" &> /dev/null ; then
+    # shellcheck disable=SC2086 # the ps -q call fails with quotes around the variable
+    PARENTPROC=$(ps -q$PARENTPID -o args=)
+    if [[ $PARENTPROC = */opt/adsb/docker-compose-start* ]] ; then
+        # this one is special as it's just a pretty wrapper around this script,
+        # so instead look for the process that called docker-compose-start
+        # shellcheck disable=SC2086 # the ps -p call fails with quotes around the variable
+        PARENTPID=$(ps -cp $PARENTPID -o ppid="")
+        if kill -0 "$PARENTPID" &> /dev/null ; then
+            # shellcheck disable=SC2086 # the ps -q call fails with quotes around the variable
+            PARENTPROC=$(ps -q$PARENTPID -o args=)
+        else
+            PARENTPROC="process $PARENTPID (appears already gone)"
+        fi
+    fi
+else
+    PARENTPROC="process $PARENTPID (appears already gone)"
+fi
+
+echo "$(date -u +"%FT%T.%3NZ") $$: $PARENTPROC called docker-compose-adsb $@"
+
+
+lockFile="/opt/adsb/docker-starting.lock"
+exec 9>>"$lockFile"
+
+if ! flock --exclusive --nonblock 9; then
+    echo "$(date -u +"%FT%T.%3NZ") $$: docker-compose-adsb will wait for lock"
+    if ! timeout 600 flock --exclusive 9; then
+        echo "$(date -u +"%FT%T.%3NZ") $$: docker-compose-adsb failed to get lock after 10 minutes, exiting"
+        exit 1
+    fi
+    echo "$(date -u +"%FT%T.%3NZ") $$: docker-compose-adsb acquired lock"
+fi
+
+docker_compose="docker compose"
+$docker_compose version &> /dev/null || docker_compose="docker-compose"
+
+# when we restart the containers after an upgrade from v1.2.3 or earlier to a later version,
+# the very first time we still need to check for the old name of the environment variable
+# To make this less ugly, check for the partial name
+if grep -q "_IS_BASE_CONFIG_FINISHED=True" /opt/adsb/config/.env 2> /dev/null ; then
+    source /opt/adsb/default.docker-compose
+    cd /opt/adsb/config || echo "config folder is missing?" >&2
+    if [ -f .env.user ] ; then
+        # now inject the user env values
+        echo "$(date -u +"%FT%T.%3NZ") inject user env"
+        python3 /opt/adsb/scripts/inject-env.py .env.user *.yml
+    fi
+    echo "$(date -u +"%FT%T.%3NZ") $docker_compose ${COMPOSE_FILES[@]} $@"
+    success="false"
+    # third time's a charm
+    for i in {1..3}; do
+        $docker_compose "${COMPOSE_FILES[@]}" "$@" && success="true" && break
+    done
+    if [ "$1" = "up" ] ; then
+        if [[ $success != true && "$docker_compose" == "docker-compose" ]]; then
+            # last ditch effort if we're dealing with the older docker-compose
+            $docker_compose "${COMPOSE_FILES[@]}" down -t 30
+            $docker_compose "${COMPOSE_FILES[@]}" "$@" && success="true"
+        fi
+        if [[ $success == true ]]; then
+            rm -f /opt/adsb/state/compose_up_failed
+            echo "$(date -u +"%FT%T.%3NZ") finished docker compose up" >&2
+        else
+            touch /opt/adsb/state/compose_up_failed
+            echo "$(date -u +"%FT%T.%3NZ") docker compose up failed 3x" >&2
+            (
+                echo "docker thinks these containers are running:"
+                docker ps
+                echo "docker thinks these networks are defined:"
+                docker network ls
+            ) >&2
+        fi
+    fi
+else
+    echo "$(date -u +"%FT%T.%3NZ") things aren't configured, yet, only starting Dozzle and the logger container"
+    # third time's a charm
+    for i in {1..3}; do
+        $docker_compose -f /opt/adsb/config/dozzle.yml "$@" && break
+    done
+    if [[ "$1" == "pull" ]]; then
+        echo "$(date -u +"%FT%T.%3NZ") things aren't configured, yet, but for argument pull will also pull ultrafeeder"
+        for i in {1..3}; do
+            docker pull "$(grep /opt/adsb/docker.image.versions -e ULTRAFEEDER_CONTAINER | cut -d= -f2)" && break
+            # compose needs the network to be defined even for pulling, so we can't use compose to
+            # pull ultrafeeder yet as adsb_im_bridge is not defined yet (in dozzle.yml which was
+            # pulled but no compose up has been run yet)
+            #$docker_compose --env-file /opt/adsb/docker.image.versions -f /opt/adsb/config/docker-compose.yml pull && break
+        done
+    fi
+fi

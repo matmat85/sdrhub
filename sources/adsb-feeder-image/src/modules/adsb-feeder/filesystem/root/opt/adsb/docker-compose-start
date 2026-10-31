@@ -1,0 +1,12 @@
+#!/bin/bash
+
+if [[ ! -f /opt/adsb/init-complete ]] && grep -e 'AF_IS_BASE_CONFIG_FINISHED=True' /opt/adsb/config/.env; then
+    if [[ -f /opt/adsb/os.adsb.feeder.image ]] ; then
+        echo "feeder image first time adsb-system-restart: stop bootstrap"
+        systemctl disable adsb-bootstrap
+        systemctl stop adsb-bootstrap
+    fi
+    touch /opt/adsb/init-complete
+fi
+
+exec /opt/adsb/docker-compose-adsb up -d -t 30 --remove-orphans

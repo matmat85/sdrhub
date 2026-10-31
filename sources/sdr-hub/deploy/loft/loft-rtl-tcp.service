@@ -1,0 +1,19 @@
+[Unit]
+Description=Loft second SDR RTL-TCP server
+Wants=network-online.target
+After=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/default/loft-radios
+ExecStart=/usr/bin/rtl_tcp -a ${LOFT_BIND_ADDRESS} -p ${SDR_HUB_PORT} -d ${SDR_HUB_SERIAL} -s ${SDR_HUB_SAMPLE_RATE}
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+ProtectHome=true
+ProtectSystem=strict
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

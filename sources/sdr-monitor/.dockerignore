@@ -1,0 +1,13 @@
+.dockerignore
+.gitignore
+.vscode
+**/.git*
+**/*.md
+**/*.mo
+**/__pycache__
+cache
+data
+Dockerfile
+patches
+static/libs
+tools

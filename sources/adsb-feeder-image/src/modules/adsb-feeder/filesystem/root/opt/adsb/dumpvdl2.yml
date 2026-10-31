@@ -1,0 +1,32 @@
+services:
+  dumpvdl2:
+    image: ${DUMPVDL2_CONTAINER}
+    container_name: dumpvdl2
+    hostname: dumpvdl2
+    restart: unless-stopped
+    networks:
+      - adsb_im_bridge
+    healthcheck:
+      disable: true
+    environment:
+      #    - QUIET_LOGS=true
+      - TZ=${FEEDER_TZ}
+      - SOAPYSDR=${VDL2_SDR_STRING}
+      - SOAPY_DEVICE_SETTINGS=${VDL2_DEVICE_SETTINGS}
+      - RTL_SERIAL=${FEEDER_SERIAL_VDL2_RTL}
+      - BIASTEE=${VDL2_DEVICE_BIASTEE}
+      - GAIN=${VDL2_GAIN}
+      - FREQUENCIES=${VDL2_FREQUENCIES:-136975000 136945000 136925000 136825000 136800000 136775000}
+      - FEED_ID=${VDL2_FEED_ID}
+      - VDL2_FILTER_ENABLE=true
+      - ZMQ_MODE=client
+      - ZMQ_ENDPOINT=tcp://acars_router:35555
+      # USER_PROVIDED_ENV_START
+      # USER_PROVIDED_ENV_END
+    tmpfs:
+      - /var/log:size=64M
+    device_cgroup_rules:
+      - "c 189:* rwm"
+    volumes:
+      - /run/adsb-feeder-dumpvdl2:/run
+      - /dev/bus/usb:/dev/bus/usb:ro

@@ -1,0 +1,19 @@
+{% extends "generic/section_dialog.html" %}
+{% load i18n %}
+{% load crispy_forms_tags %}
+{% load sdr_filters %}
+{% load static %}
+
+{% block section_title %}Monitor settings{% endblock %}
+
+{% block section_content %}
+<div class="row mt-2">
+    <form method="post">
+        {% csrf_token %}
+        {{ form|crispy }}
+        <div class="text-center">
+            <button class="btn btn-primary" type="submit">Save</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

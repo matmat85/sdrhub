@@ -1,0 +1,153 @@
+{% extends "generic/section_small.html" %}
+{% load i18n %}
+{% load sdr_filters %}
+{% load static %}
+
+{% block section_title %}Sdr settings{% endblock %}
+
+{% block main_scripts %}
+<script src="{% static 'js/config.js' %}"></script>
+{% endblock %}
+
+{% block section_content %}
+<div class="modal fade" id="save_success" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="exampleModalLabel">Configuration</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                Save success!
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Ok</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal modal-lg fade" id="preview_flights" tabindex="-1" aria-labelledby="previewFlightsModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="previewFlightsModalLabel">Upcoming satellites flights in next 7 days</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div id="preview_flights_content" class="modal-body">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Ok</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="config" style="display: none;" mqtt_url="{{ mqtt.url }}" mqtt_user="{{ mqtt.user }}" mqtt_password="{{ mqtt.password }}" mqtt_frontend_path="{{ mqtt.frontend_path }}">
+</div>
+<div class="row mt-2">
+    <div class="row" id="loading_section">
+        <div class="text-center">
+            <div class="spinner-border" role="status">
+            </div>
+            <div>
+                <span class="sr-only">Loading...</span>
+            </div>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-md-5">
+            <h3>Scanner settings:</h3>
+            <div id="scanner_selector">
+            </div>
+        </div>
+        <div class="col-md-7">
+            <h3>Sdr device settings:</h3>
+            <div id="device_selector">
+            </div>
+        </div>
+    </div>
+    <hr class="hr hr-blurry" />
+    <div class="row">
+        <div class="col-md-5">
+            <div id="scanner_section" style="display: none;">
+                <ul class="nav nav-tabs" id="myTab" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#scanner-tab1" type="button" role="tab">Ignored frequencies</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#scanner-tab2" type="button" role="tab">Other</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#scanner-tab3" type="button" role="tab">Satellites</button>
+                    </li>
+                </ul>
+
+                <div class="tab-content">
+                    <div class="tab-pane show active" id="scanner-tab1" role="tabpanel">
+                        {% include "config_scanner_ignored_frequencies.html" %}
+                    </div>
+                    <div class="tab-pane" id="scanner-tab2" role="tabpanel">
+                        {% include "config_scanner_other.html" %}
+                    </div>
+                    <div class="tab-pane" id="scanner-tab3" role="tabpanel">
+                        {% include "config_scanner_satellites.html" %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-7">
+            <div id="device_section" style="display: none;">
+                <div id="remote_device_settings" style="display: none;">
+                    <label for="device_rtltcp" class="form-label">Remote RTL-TCP host[:port]</label>
+                    <input id="device_rtltcp" type="text" class="form-control" autocomplete="off">
+                    <div class="form-text">Use a private LAN address. Save to reconnect to the receiver.</div>
+                </div>
+                <h5>Device enabled</h5>
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="device_enabled" autocomplete="off">
+                </div>
+                <div id="device_settings">
+                    <ul class="nav nav-tabs" id="myTab" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#device-tab-detector" type="button" role="tab">Detector</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#device-tab-satellites" type="button" role="tab">Satellites</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#device-tab-crontab" type="button" role="tab">Scheduler</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#device-tab-gains" type="button" role="tab">Gains</button>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content">
+                        <div class="tab-pane show active" id="device-tab-detector" role="tabpanel">
+                            {% include "config_device_main.html" %}
+                            {% include "config_device_precision.html" %}
+                        </div>
+                        <div class="tab-pane" id="device-tab-gains" role="tabpanel">
+                            {% include "config_device_gains.html" %}
+                        </div>
+                        <div class="tab-pane" id="device-tab-satellites" role="tabpanel">
+                            {% include "config_device_satellites.html" %}
+                        </div>
+                        <div class="tab-pane" id="device-tab-crontab" role="tabpanel">
+                            {% include "config_device_crontab.html" %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="row mt-2">
+        <div class="col-md">
+            <div class="d-grid gap-2">
+                <button id="save" type="button" class="btn btn-primary" disabled="disabled" autocomplete="off">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

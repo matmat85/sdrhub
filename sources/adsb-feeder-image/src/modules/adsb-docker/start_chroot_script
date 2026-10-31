@@ -1,0 +1,116 @@
+#!/usr/bin/env bash
+# this is an adaptation of Ramon Kolb's docker-install.sh
+# modified to build a base image (so intended for non-interactive use) by Dirk Hohndel <dirk@hohndel.org>
+########
+set -ex
+
+source /common.sh
+install_cleanup_trap
+
+df -h
+
+# install docker without the crud, this mostly follows what the script at get.docker.com does
+DEBIAN_DISTRO=$(grep /etc/os-release -e VERSION_CODENAME | cut -d= -f2)
+install -m 0755 -d /etc/apt/keyrings
+curl -fsSL "https://download.docker.com/linux/debian/gpg" -o /etc/apt/keyrings/docker.asc
+chmod a+r /etc/apt/keyrings/docker.asc
+echo "deb [arch=arm64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian $DEBIAN_DISTRO stable" > /etc/apt/sources.list.d/docker.list
+apt-get -qq update >/dev/null
+DEBIAN_FRONTEND=noninteractive apt-get -y install --no-install-recommends docker-ce docker-ce-cli containerd.io docker-compose-plugin
+
+df -h
+
+#shellcheck shell=bash external-sources=false disable=SC1090,SC2164
+# DOCKER-INSTALL.SH -- Installation script for the Docker infrastructure on a Raspbian or Ubuntu system
+# Usage: source <(curl -s https://raw.githubusercontent.com/sdr-enthusiasts/docker-install/main/docker-install.sh)
+#
+# Copyright 2021-2023 Ramon F. Kolb (kx1t)- licensed under the terms and conditions
+# of the MIT license. The terms and conditions of this license are included with the Github
+# distribution of this package.
+#
+#
+    mkdir -p /etc/docker
+    cat > /etc/docker/daemon.json <<EOF
+{
+  "log-driver": "journald",
+  "log-level": "warn",
+  "userland-proxy": false,
+  "debug": false
+}
+EOF
+    chmod u=rw,go=r /etc/docker/daemon.json
+
+    BLOCKED_MODULES=("rtl2832_sdr")
+    BLOCKED_MODULES+=("dvb_usb_rtl2832u")
+    BLOCKED_MODULES+=("dvb_usb_rtl28xxu")
+    BLOCKED_MODULES+=("dvb_usb_v2")
+    BLOCKED_MODULES+=("r820t")
+    BLOCKED_MODULES+=("rtl2830")
+    BLOCKED_MODULES+=("rtl2832")
+    BLOCKED_MODULES+=("rtl2838")
+    BLOCKED_MODULES+=("dvb_core")
+    echo -n "Getting the latest UDEV rules... "
+    mkdir -p /etc/udev/rules.d /etc/udev/hwdb.d
+    # First install the UDEV rules for RTL-SDR dongles
+    curl -sL -o /etc/udev/rules.d/rtl-sdr.rules https://raw.githubusercontent.com/wiedehopf/adsb-scripts/master/osmocom-rtl-sdr.rules &
+    curl -sL -o /etc/udev/rules.d/dump978-fa.rules https://raw.githubusercontent.com/flightaware/dump978/master/debian/dump978-fa.udev &
+    # Now install the UDEV rules for SDRPlay devices
+    curl -sL -o /etc/udev/rules.d/66-mirics.rules https://raw.githubusercontent.com/sdr-enthusiasts/install-libsdrplay/main/66-mirics.rules &
+    curl -sL -o /etc/udev/hwdb.d/20-sdrplay.hwdb https://raw.githubusercontent.com/sdr-enthusiasts/install-libsdrplay/main/20-sdrplay.hwdb &
+    wait
+    # Next, exclude the drivers so the dongles stay accessible
+    echo -n "Excluding and unloading any competing RTL-SDR drivers... "
+    UNLOAD_SUCCESS=true
+    for module in "${BLOCKED_MODULES[@]}"
+    do
+        if ! grep -q "$module" /etc/modprobe.d/exclusions-rtl2832.conf
+        then
+          echo blacklist "$module" >>/etc/modprobe.d/exclusions-rtl2832.conf
+          echo install "$module" /bin/false >>/etc/modprobe.d/exclusions-rtl2832.conf
+        fi
+    done
+
+    if [[ "${UNLOAD_SUCCESS}" == false ]]; then
+      echo "INFO: Although we've successfully excluded any competing RTL-SDR drivers, we weren't able to unload them. This will remedy itself when you reboot your system after the script finishes."
+    fi
+
+#
+# The following prevents DHCPCD based systems from trying to assign IP addresses to each of the Docker containers.
+# Note that this is not needed or available if the system uses DHCPD instead of DHCPCD.
+if [[ -f /etc/dhcpcd.conf ]] && ! grep "denyinterfaces veth\*" /etc/dhcpcd.conf >/dev/null 2>&1
+then
+  echo -n "Excluding veth interfaces from dhcp. This will prevent problems if you are connected to the internet via WiFi when running many Docker containers... "
+  sh -c 'echo "denyinterfaces veth*" >> /etc/dhcpcd.conf'
+  # don't do that during setup: sudo systemctl restart dhcpcd.service
+  echo "done!"
+fi
+
+cat >> /etc/systemd/system.conf <<EOF
+RuntimeWatchdogSec=15
+RebootWatchdogSec=10min
+EOF
+
+# Add some aliases to localhost in `/etc/hosts`. This will speed up recreation of images with docker-compose
+if ! grep localunixsocket /etc/hosts >/dev/null 2>&1
+then
+  echo "Speeding up the recreation of containers when using docker-compose..."
+  sed -i 's/^\(127.0.0.1\s*localhost\)\(.*\)/\1\2 localunixsocket localunixsocket.local localunixsocket.home/g' /etc/hosts
+fi
+
+if [[ -f /boot/firmware/cmdline.txt ]]; then
+    # Raspbian: set wifi country on boot
+    # we also set this in net-or-hotspot.sh which is redundant in newer images that have this
+    sed -i \
+        -e "s/\s*cfg80211.ieee80211_regdom=\S*//" \
+        -e "s/\(.*\)/\1 cfg80211.ieee80211_regdom=PA/" \
+        /boot/firmware/cmdline.txt
+fi
+if [ -f /var/lib/NetworkManager/NetworkManager.state ]; then
+    # we need wifi to work on first boot, so enable it in NetworkManager.state
+    sed -i 's/^WirelessEnabled=.*/WirelessEnabled=true/' /var/lib/NetworkManager/NetworkManager.state
+fi
+if [[ -f /boot/firmware/config.txt ]]; then
+    # for raspbian, reduce GPU memory to gain 48M of memory (very significant on 512 M systems)
+    # this image does not plan to use the video output ever (and it apparently still works with limited feature set with 16M of gpu mem)
+    echo "gpu_mem=16" >> /boot/firmware/config.txt
+fi

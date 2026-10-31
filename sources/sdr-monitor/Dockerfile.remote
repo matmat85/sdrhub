@@ -1,0 +1,8 @@
+ARG SDR_MONITOR_BASE=shajen/sdr-monitor:latest
+FROM ${SDR_MONITOR_BASE}
+COPY sdr/static/js/config.js /app/sdr/static/js/config.js
+COPY sdr/templates/config.html /app/sdr/templates/config.html
+COPY sdr/radio.py /app/sdr/radio.py
+COPY sdr/urls.py /app/sdr/urls.py
+COPY sdr/templates/radio.html /app/sdr/templates/radio.html
+COPY templates/home.html /app/templates/home.html

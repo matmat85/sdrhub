@@ -1,0 +1,11 @@
+{% extends "generic/section_dialog.html" %}
+{% load i18n %}
+
+{% block section_title %}{% trans "WELCOME TITLE" %}{% endblock %}
+
+{% block section_content %}
+<div class="text-center">
+    <p><a href="{% url 'sdr_radio' %}">Listen to live FM / DAB radio</a></p>
+    <p class="fs-2">{% trans "WELCOME MESSAGE" %}</p>
+</div>
+{% endblock %}

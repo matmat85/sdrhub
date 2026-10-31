@@ -1,0 +1,42 @@
+services:
+  acarshub:
+    image: ${ACARSHUB_CONTAINER}
+    container_name: acarshub
+    hostname: acarshub
+    healthcheck:
+      disable: true
+    restart: unless-stopped
+    networks:
+      - adsb_im_bridge
+    ports:
+      - ${AF_ACARSHUB_PORT:-8090}:80
+      - 5550:5550/udp
+      - 5555:5555/udp
+      - 15550:15550
+      - 15555:15555
+    volumes:
+      - "$ACARSHUB_DATA_PATH:/run/acars"
+    tmpfs:
+      - /database:exec,size=64M
+      - /run:exec,size=64M
+      - /var/log:size=64M
+      - /tmp:size=64M
+    environment:
+      - TZ=${FEEDER_TZ}
+      - ENABLE_VDLM=${FEEDER_ACARSHUB_EXTERNAL_VDL2}
+      - ENABLE_ACARS=${FEEDER_ACARSHUB_EXTERNAL_ACARS}
+      - ENABLE_HFDL=${FEEDER_ACARSHUB_EXTERNAL_HFDL}
+      - QUIETMESSAGES=false
+      - MIN_LOG_LEVEL=4
+      - IATA_OVERRIDE=UP|UPS|United Parcel Service;GS|FTH|Mountain Aviation (Foothills);GS|EJA|ExecJet
+      - ENABLE_ADSB=${FEEDER_ACARS_ENABLE_ADSB}
+      - ADSB_URL=http://ultrafeeder/data/aircraft.json
+      - ADSB_LAT=${FEEDER_LAT}
+      - ADSB_LON=${FEEDER_LONG}
+      - HIDE_VERSION_UPDATE=True
+      # unless this is optimize or merge, the DB can grow quite a bit due to the FTS index not being
+      # cleaned up
+      - DB_FTS_OPTIMIZE=merge
+      # USER_PROVIDED_ENV_START
+      # USER_PROVIDED_ENV_END
+

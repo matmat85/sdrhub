@@ -1,0 +1,28 @@
+services:
+  planewatch:
+    image: ${PW_CONTAINER}
+    healthcheck:
+      disable: true
+    container_name: planewatch
+    hostname: planewatch
+    restart: unless-stopped
+    networks:
+      - adsb_im_bridge
+    cpu_period: 50000
+    cpu_quota: 7500
+    stop_grace_period: 3s
+    environment:
+      - GOMAXPROCS=1
+      - BEASTHOST=ultrafeeder
+      - LAT=${FEEDER_LAT}
+      - LONG=${FEEDER_LONG}
+      - ALT=${FEEDER_ALT_M}m
+      - TZ=${FEEDER_TZ}
+      - API_KEY=${FEEDER_PLANEWATCH_API_KEY}
+      - ENABLE_MLAT=${MLAT_ENABLE}
+      - S6_KILL_GRACETIME=1000
+      # USER_PROVIDED_ENV_START
+      # USER_PROVIDED_ENV_END
+    tmpfs:
+      - /run:exec,size=64M
+      - /var/log

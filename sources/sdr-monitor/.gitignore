@@ -1,0 +1,8 @@
+.vscode
+*.mo
+*.pyc
+cache
+data
+patches
+static/libs
+tools

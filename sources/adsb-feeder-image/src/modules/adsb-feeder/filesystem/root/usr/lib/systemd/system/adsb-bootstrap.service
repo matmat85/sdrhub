@@ -1,0 +1,14 @@
+[Unit]
+Description=ADS-B Feeder Bootstrap Service
+After=network-online.target adsb-hotspot.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/adsb
+ExecStart=/bin/bash /opt/adsb/bootstrap.sh
+TimeoutStartSec=0
+SyslogIdentifier=adsb-bootstrap
+
+[Install]
+WantedBy=multi-user.target

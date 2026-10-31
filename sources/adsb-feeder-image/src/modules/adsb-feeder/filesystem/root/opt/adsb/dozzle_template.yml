@@ -1,0 +1,36 @@
+networks:
+  adsb_im_bridge:
+    name: adsb_im_bridge
+    driver: bridge
+    enable_ipv6: DOCKER_IPV6
+
+services:
+  dozzle:
+    container_name: dozzle
+    hostname: dozzle
+    image: ${DOZZLE_CONTAINER}
+    healthcheck:
+      disable: true
+    restart: unless-stopped
+    networks:
+      - adsb_im_bridge
+    environment:
+      - DOZZLE_NO_ANALYTICS=1
+      # USER_PROVIDED_ENV_START
+      # USER_PROVIDED_ENV_END
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - ${AF_DAZZLE_PORT:-9999}:8080
+
+  adsb-setup-proxy:
+    container_name: adsb-setup-proxy
+    image: ${ALPINE_CONTAINER}
+    networks:
+      - adsb_im_bridge
+    healthcheck:
+      disable: true
+    stop_signal: SIGKILL
+    command: tail -n0 -f /opt/adsb-setup.log
+    volumes:
+      - /run/adsb-feeder-image.log:/opt/adsb-setup.log

@@ -1,0 +1,6 @@
+# Source revisions used for the edited exports (the exports include local changes).
+sdr-hub https://github.com/shajen/sdr-hub 15c953d5c4988cecac973d83c8f695bf64e5eef0
+sdr-monitor https://github.com/shajen/sdr-monitor e593ad0f8947539020fda33c98f4599f94b230e0
+rtl-sdr-scanner-cpp https://github.com/shajen/rtl-sdr-scanner-cpp 981fd244cdb0056c68184e66956f95fdcb08b127
+adsb-feeder-image https://github.com/dirkhh/adsb-feeder-image 8f8b9cd02cccf1ddb6eab0d1844d4dce7a686c00
+CustomPiOS https://github.com/dirkhh/CustomPiOS 4ec5cc085194c1b5f43a95886af7d785ba430b18

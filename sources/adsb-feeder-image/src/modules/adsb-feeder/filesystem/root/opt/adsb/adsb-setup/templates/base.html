@@ -1,0 +1,903 @@
+<!DOCTYPE html>
+{% if env_value_by_tag("css_theme") == 'light' %}
+<html lang="en" data-mdb-theme="light">
+{% elif env_value_by_tag("css_theme") == 'dark' %}
+<html lang="en" data-mdb-theme="dark">
+{% else %}
+<html lang="en" data-mdb-theme="auto">
+{% endif %}
+<!-- import "mdb-ui-kit" -->
+
+<head>
+  <!-- Required meta tags -->
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+  <!-- Google Fonts Roboto. Copyright 2011 Google Inc. All Rights Reserved. See {{ url_for('static', filename='fonts/LICENSE.txt') }} -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/fonts.css') }}" />
+  <!-- MDB -->
+  <link rel="stylesheet" id="css-theme" href="{{ url_for('static', filename='css/mdb.min.css') }}" />
+  {% if not ((env_value_by_tag("css_theme") == 'light') or (env_value_by_tag("css_theme") == 'dark')) %}
+  <script>
+
+    ; (function () {
+      const htmlElement = document.querySelector("html")
+      if (htmlElement.getAttribute("data-mdb-theme") === 'auto') {
+        function updateTheme() {
+          document.querySelector("html").setAttribute("data-mdb-theme",
+            window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+        }
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', updateTheme)
+        updateTheme()
+      }
+    })()
+  </script>
+  {% endif %}
+  <link rel="shortcut icon" href="/static/favicon{% if env_value_by_tag('aggregator_choice') == 'nonadsb' %}-sdr{% endif %}.ico" />
+  <!-- Spinner -->
+  <link rel="stylesheet" href="/static/css/style.css" />
+  <!-- widget_mode is {{ widget_mode }} -->
+  {% if not widget_mode %}
+  <title>
+    {{ list_value_by_tag("site_name", 0) }}{% if list_value_by_tag("site_name", 0) != "" %}:
+    {% endif %}{% block title %}{% endblock %}
+  </title>
+  <nav class="navbar fixed-top bg-body navbar-expand" id="navbar">
+    {% if env_value_by_tag("aggregator_choice") != 'nonadsb' %}
+    <a class="navbar-brand mx-1 me-sm-3" href="{{ url_for("director") }}"><img style="height:2em;"
+      src="/static/images/adsbim-logo-64.png" alt="adsb.im"><span id="brand_text">ADS-B Feeder</span></a>
+    {% else %}
+    <a class="navbar-brand mx-1 me-sm-3" href="{{ url_for("director") }}"><img style="height:2em;"
+      src="/static/images/sdrim-logo-64.png" alt="adsb.im"><span id="brand_text">SDR Feeder</span></a>
+    {% endif %}
+    <a class="btn btn-primary ms-0 me-1 mx-sm-1 nb-btn {% if not is_enabled('base_config') %}d-none{% endif %}"
+      id="livemap-navbar-button"
+      href="/map/{{ env_value_by_tag('tar1090_query_params') }}"><span class="icon-placeholder" data-icon="adsb" style="height: 2em;"></span><span id="livemap-navbar-button-text">Live Map</span></a>
+    <a class="btn btn-primary ms-0 me-1 mx-sm-1 nb-btn {% if not is_enabled('acarshub') %}d-none{% endif %}"
+      id="acarshub-navbar-button"
+      href="/acarshub"><span class="icon-placeholder" data-icon="acars"></span><span id="acarshub-navbar-button-text">ACARS Hub</span></a>
+    <a class="btn btn-primary ms-0 me-1 mx-sm-1 nb-btn {% if not is_enabled('run_shipfeeder') %}d-none{% endif %}"
+      id="aiscatcher-navbar-button"
+      href="/aiscatcher"><span class="icon-placeholder" data-icon="ais"></span><span id="aiscatcher-navbar-button-text">AIS Catcher</span></a>
+    <a class="btn btn-primary ms-0 me-1 mx-sm-1 nb-btn {% if not is_enabled('run_sonde') %}d-none{% endif %}"
+      id="radiosonde-navbar-button"
+      href="/radiosonde"><span class="icon-placeholder" data-icon="sonde"></span><span id="radiosonde-navbar-button-text">SONDE</span></a>
+    {% if is_enabled('temperature_block') %}
+    <div id="cpu_temp_block" class="d-none ms-0 me-1 mx-sm-1" style="line-height:0.9em;font-size:0.7em">
+      <span>CPU</span>
+      <br>
+      <span id="cpu_temp"></span>
+    </div>
+    <div id="ext_temp_block" class="d-none ms-0 me-1 mx-sm-1" style="line-height:0.9em;font-size:0.7em;">
+      <span>EXT</span>
+      <br>
+      <span id="ext_temp"></span>
+    </div>
+    {% endif %}
+    <div class="mx-auto"><!-- filler element --></div>
+    <div class="mt-1 mx-1"><a href="https://ko-fi.com/H2H2H3JS5" target="_blank"><img height="2em" style="border:0.1em;height:1.8em;"
+         src="/static/images/kofi_button_stroke_small.png" border="0" id="kofi-navbar-button"
+         alt="Help sustain this project at ko-fi.com" /></a></div>
+    <button class="navbar-toggler" type="button" data-mdb-toggle="collapse" data-mdb-target="#navbarNav"
+            aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+      <svg viewBox="-5 0 10 8" width="1.5em">
+        <line y2="8" stroke="#000" stroke-width="8" stroke-dasharray="1.6 1.4"></line>
+      </svg>
+    </button>
+    <div class="collapse navbar-collapse justify-content-end" style="flex-grow: 0" id="navbarNav">
+      <ul class="navbar-nav ms-1 mb-2 mb-lg-0">
+        {% if is_enabled('stage2') %}
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownFeederSelection" role="button"
+              data-mdb-toggle="dropdown" aria-expanded="false">Target: </a>
+          <ul class="dropdown-menu" aria-labelledby="navbarDropdownFeederSelection" style="width: 18em">
+            <div class="row mx-2 g-1">
+              <div class="col-12 my-1 text-secondary">Select the target for maps/sharing</div>
+              <div class="col-6 my-1">
+                <button type="submit" class="btn-sm btn-outline-secondary btn-rounded btn-block"
+                        onclick="stage2_feeder_target_submit(0);return false;">Combined</button>
+              </div>
+              {% for i in range(env_value_by_tag('num_micro_sites')) %}
+              <div class="col-3 my-1">
+                <button type="submit" class="btn-sm btn-outline-secondary btn-rounded btn-block"
+                        onclick="stage2_feeder_target_submit({{ i + 1 }});return false;"><span width="2em">{{ i + 1 }}</span></button>
+              </div>
+              {% endfor %}
+            </div>
+          </ul>
+        </li>
+        {% endif %}
+        <!-- Maps -->
+        <li class="nav-item dropdown {% if not is_enabled('base_config') %}d-none{% endif %}">
+          <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownMaps" role="button"
+              data-mdb-toggle="dropdown" aria-expanded="false">Maps</a>
+          <ul class="dropdown-menu" aria-labelledby="navbarDropdownMaps">
+            <li><a id="live_traffic" class="dropdown-item" href="/map/{{ env_value_by_tag('tar1090_query_params') }}">Live Traffic</a>
+            </li>
+            {% if env_value_by_tag("aggregator_choice") != 'nano' and env_value_by_tag("aggregator_choice") != 'nonadsb' %}
+            <li><a id="heatmap" class="dropdown-item" href="/map/?heatmap">Heatmap</a></li>
+            {% endif %}
+            <li><a id="tracks" class="dropdown-item" href="/map/?pTracks">Tracks</a></li>
+            {% if env_value_by_tag("aggregator_choice") != 'nano' and env_value_by_tag("aggregator_choice") != 'nonadsb' %}
+            <li><a id="replay" class="dropdown-item" href="/map/?replay">Replay</a></li>
+            {% endif %}
+            <li><a id="options" class="dropdown-item" href="/visualization">Options</a></li>
+            {% if is_enabled('acarshub') %}
+            <li><a class="dropdown-item" href="/acarshub">ACARS Hub</a></li>
+            {% endif %}
+            {% if is_enabled('run_shipfeeder') %}
+            <a class="dropdown-item" href="/aiscatcher">AIS Catcher</a>
+            {% endif %}
+          </ul>
+        </li>
+        <!-- Data Sharing -->
+        {% if not is_enabled('stage2') %}
+        <li class="nav-item"><a
+              class="nav-link" id="data_sharing_link"
+              {% if (not is_enabled('base_config') or env_value_by_tag('aggregator_choice') in ['micro', 'nano']) and not is_enabled('shipfeeder') and not is_enabled('acarshub') %}style="display: none;"{% endif %}
+              href="/aggregators">Data Sharing</a>
+        </li>
+        {% else %}
+        <li id="data_sharing_current" class="nav-item">
+          <a class="nav-link" href="#" id="data_sharing_current_link">Data Sharing</a>
+        </li>
+        {% endif %}
+        <!-- Setup -->
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownSetup" role="button"
+              data-mdb-toggle="dropdown" aria-expanded="false">Setup</a>
+          <ul class="dropdown-menu" aria-labelledby="navbarDropdownSetup">
+            <li><a class="dropdown-item" href="/setup">{% if is_enabled('stage2') %}Stage
+                2{% else %}Basic{% endif %}</a></li>
+            <li><a class="dropdown-item {% if not is_enabled('base_config') %}d-none{% endif %}"
+                  href="/sdr_setup">SDR</a></li>
+            <li><a class="dropdown-item {% if not is_enabled('base_config') %}d-none{% endif %}"
+                  href="/advanced">Advanced</a></li>
+            <li><a class="dropdown-item {% if not is_enabled('base_config') %}d-none{% endif %}"
+                  href="/expert">Expert</a></li>
+          </ul>
+        </li>
+        <!-- System -->
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownLogs" role="button"
+              data-mdb-toggle="dropdown" aria-expanded="false">System</a>
+          <ul class="dropdown-menu" aria-labelledby="navbarDropdownLogs">
+            <li><a class="dropdown-item" href="/logs/">Logs</a></li>
+            <li><a class="dropdown-item" href="/info">Support Info</a></li>
+            <li><a class="dropdown-item" href="/support">Share Diagnostics</a></li>
+            <li><a class="dropdown-item" href="/systemmgmt">Management</a></li>
+            <li><a class="dropdown-item" href="/backup">Backup</a></li>
+            <li><a class="dropdown-item" href="/restore">Restore</a></li>
+            {% if env_value_by_tag("aggregator_choice") != 'nano' and env_value_by_tag("aggregator_choice") != 'nonadsb' %}
+            <li><a class="dropdown-item" href="/stats/">{%if is_enabled('stage2')%}Combined {%endif%}Stats</a></li>
+            {% if is_enabled('stage2') %}
+            <li><a id="stats_current" class="dropdown-item" href="/stats_1/">Current Stats</a></li>
+            {% endif %}
+            {% endif %}
+            {% if is_enabled('skystats') %}
+            <li><a class="dropdown-item" href="/skystats/">Skystats</a></li>
+            {% endif %}
+          </ul>
+            </li>
+      </ul>
+    </div>
+  </nav>
+  <!-- widget_mode-->
+  {% endif %}
+</head>
+
+<body>
+  <div id="overlay" style="display: none">
+    <div id="loader" style="display: none">
+      <div class="plane-animation">
+        <div class="clouds">
+          <div class="cloud cloud1">
+            <svg viewBox="0 0 21 19" xmlns="http://www.w3.org/2000/svg">
+              <path d="m3 13.649c0 2.9551 2.4177 5.3507 5.4 5.3507h8.1c2.4853 0 4.5-2.0161 4.5-4.5031 0-1.8466-1.1107-3.552-2.7-4.2469-0.1683-2.9275-2.616-5.25-5.6107-5.25-2.3379 0-4.3424 1.4864-5.1893 3.5-2.7 0.4375-4.5 2.7001-4.5 5.1493z" stroke="none"/>
+            </svg>
+          </div>
+          <div class="cloud cloud2">
+            <svg viewBox="0 0 21 19" xmlns="http://www.w3.org/2000/svg">
+              <path d="m3 13.649c0 2.9551 2.4177 5.3507 5.4 5.3507h8.1c2.4853 0 4.5-2.0161 4.5-4.5031 0-1.8466-1.1107-3.552-2.7-4.2469-0.1683-2.9275-2.616-5.25-5.6107-5.25-2.3379 0-4.3424 1.4864-5.1893 3.5-2.7 0.4375-4.5 2.7001-4.5 5.1493z" stroke="none"/>
+            </svg>
+          </div>
+          <div class="cloud cloud3">
+            <svg viewBox="0 0 21 19" xmlns="http://www.w3.org/2000/svg">
+              <path d="m3 13.649c0 2.9551 2.4177 5.3507 5.4 5.3507h8.1c2.4853 0 4.5-2.0161 4.5-4.5031 0-1.8466-1.1107-3.552-2.7-4.2469-0.1683-2.9275-2.616-5.25-5.6107-5.25-2.3379 0-4.3424 1.4864-5.1893 3.5-2.7 0.4375-4.5 2.7001-4.5 5.1493z" stroke="none"/>
+            </svg>
+          </div>
+          <div class="cloud cloud4">
+            <svg viewBox="0 0 21 19" xmlns="http://www.w3.org/2000/svg">
+              <path d="m3 13.649c0 2.9551 2.4177 5.3507 5.4 5.3507h8.1c2.4853 0 4.5-2.0161 4.5-4.5031 0-1.8466-1.1107-3.552-2.7-4.2469-0.1683-2.9275-2.616-5.25-5.6107-5.25-2.3379 0-4.3424 1.4864-5.1893 3.5-2.7 0.4375-4.5 2.7001-4.5 5.1493z" stroke="none"/>
+            </svg>
+          </div>
+          <div class="cloud cloud5">
+            <svg viewBox="0 0 21 19" xmlns="http://www.w3.org/2000/svg">
+              <path d="m3 13.649c0 2.9551 2.4177 5.3507 5.4 5.3507h8.1c2.4853 0 4.5-2.0161 4.5-4.5031 0-1.8466-1.1107-3.552-2.7-4.2469-0.1683-2.9275-2.616-5.25-5.6107-5.25-2.3379 0-4.3424 1.4864-5.1893 3.5-2.7 0.4375-4.5 2.7001-4.5 5.1493z" stroke="none"/>
+            </svg>
+          </div>
+          <div class="cloud cloud6">
+            <svg viewBox="0 0 21 19" xmlns="http://www.w3.org/2000/svg">
+              <path d="m3 13.649c0 2.9551 2.4177 5.3507 5.4 5.3507h8.1c2.4853 0 4.5-2.0161 4.5-4.5031 0-1.8466-1.1107-3.552-2.7-4.2469-0.1683-2.9275-2.616-5.25-5.6107-5.25-2.3379 0-4.3424 1.4864-5.1893 3.5-2.7 0.4375-4.5 2.7001-4.5 5.1493z" stroke="none"/>
+            </svg>
+          </div>
+          <div class="cloud cloud7">
+            <svg viewBox="0 0 21 19" xmlns="http://www.w3.org/2000/svg">
+              <path d="m3 13.649c0 2.9551 2.4177 5.3507 5.4 5.3507h8.1c2.4853 0 4.5-2.0161 4.5-4.5031 0-1.8466-1.1107-3.552-2.7-4.2469-0.1683-2.9275-2.616-5.25-5.6107-5.25-2.3379 0-4.3424 1.4864-5.1893 3.5-2.7 0.4375-4.5 2.7001-4.5 5.1493z" stroke="none"/>
+            </svg>
+          </div>
+          <div class="cloud cloud8">
+            <svg viewBox="0 0 21 19" xmlns="http://www.w3.org/2000/svg">
+              <path d="m3 13.649c0 2.9551 2.4177 5.3507 5.4 5.3507h8.1c2.4853 0 4.5-2.0161 4.5-4.5031 0-1.8466-1.1107-3.552-2.7-4.2469-0.1683-2.9275-2.616-5.25-5.6107-5.25-2.3379 0-4.3424 1.4864-5.1893 3.5-2.7 0.4375-4.5 2.7001-4.5 5.1493z" stroke="none"/>
+            </svg>
+          </div>
+        </div>
+        <div class="plane">
+          <svg viewBox="0 0 32 29" xmlns="http://www.w3.org/2000/svg">
+            <path d="M30.8,14.2C30.1,13.4,29,13,28,13H8.5L4.8,8.4C4.6,8.1,4.3,8,4,8H1C0.7,8,0.4,8.1,0.2,8.4C0,8.6,0,9,0,9.3l3,11  C3.2,20.7,3.6,21,4,21h6.4l-3.3,6.6c-0.2,0.3-0.1,0.7,0,1C7.3,28.8,7.7,29,8,29h4c0.3,0,0.6-0.1,0.7-0.3l6.9-7.7H28  c1.1,0,2.1-0.4,2.8-1.2c0.8-0.8,1.2-1.8,1.2-2.8S31.6,14.9,30.8,14.2z"/>
+            <path d="M10.4,11h8.5l-5.1-5.7C13.6,5.1,13.3,5,13,5H9C8.7,5,8.3,5.2,8.1,5.5C8,5.8,8,6.1,8.1,6.4L10.4,11z"/>
+          </svg>
+        </div>
+        <div class="runway"></div>
+      </div>
+      <div class="loading-text">Processing...</div>
+    </div>
+  </div>
+  <div class="container pt-5 my-3">
+  <script src="/static/js/jquery-3.7.1.slim.min.js" integrity="sha256-kmHvs0B+OpCW5GVHUNjv9rOmY0IvSIRcf7zGUDTDQM8="
+          crossorigin="anonymous"></script>
+  <script type="text/javascript" src="{{ url_for('static', filename='js/mdb.min.js') }}"></script>
+  <script type="text/javascript" src="{{ url_for('static', filename='js/iconCache.js') }}"></script>
+  <script>
+    let verbose = true;
+    //{{ not widget_mode }}
+    // maps[0..4] are the bit values for the maps that are visible if we can potentially not
+    // show show all of the maps, where bit 0 is ADS-B, bit 1 is ACARS, bit 2 is SHIPFEEDER, and bit 3 is SONDE
+    let maps = [0];
+    // bitsSet simply creates a lookup table to calculate how many bits are set in a four bit number
+    let bitsSet = [0];
+    for (let i = 1; i < 16; i++) {
+      bitsSet[i] = (i & 1) + bitsSet[Math.floor(i / 2)];
+    }
+    let mapsNeeded = 0;
+    {% if env_value_by_tag("aggregator_choice") != 'nonadsb' %}
+    mapsNeeded = 1;
+    {% endif %}
+    {% if is_enabled('run_hfdlobserver') or is_enabled('run_dumphfdl') or is_enabled('acars2pos') %}
+    // if we get map positions from HFDL or acars2pos, show the tar1090 map
+    mapsNeeded = mapsNeeded | 1;
+    {% endif %}
+    {% if is_enabled('acarshub') %}
+    mapsNeeded = mapsNeeded | 2;
+    {% endif %}
+    {% if is_enabled('run_shipfeeder') %}
+    mapsNeeded = mapsNeeded | 4;
+    {% endif %}
+    {% if is_enabled('run_sonde') %}
+    mapsNeeded = mapsNeeded | 8;
+    {% endif %}
+
+    for (let i = 4; i >= 1; i--) {
+      for (mask of [15, 7, 3, 1]) {
+        m = mapsNeeded & mask;
+        if (bitsSet[m] <= i) {
+          break
+        }
+      }
+      maps[i] = m;
+    }
+    let breakpointslist = [
+      //notxt, navcolaps, sm btn,  noKofi,  3 btn ,  2 btn , 1 btn  ,  0 btn
+      ["768px", "680px", "180px", "180px", "180px", "180px", "180px", "180px"],
+      ["768px", "680px", "250px", "200px", "200px", "200px", "200px", "180px"],
+      ["825px", "680px", "350px", "270px", "270px", "270px", "220px", "180px"],
+      ["960px", "768px", "420px", "300px", "300px", "260px", "215px", "180px"],
+      ["1100px", "800px", "490px", "350px", "305px", "260px", "215px", "170px"]];
+    let breakpoints = breakpointslist[bitsSet[mapsNeeded]];
+    {% if env_value_by_tag("temp_sensor") != "" %}
+    for (let i = 0; i < breakpoints.length; i++) {
+      breakpoints[i] = (parseInt(breakpoints[i]) + 80) + 'px';
+    }
+    {% endif %}
+    let nMapButtons = [];
+    for (let i = 0; i < 4; i++) {
+      nMapButtons[i] = window.matchMedia(`(max-width: ${breakpoints[7 - i]})`);
+      nMapButtons[i].addEventListener("change", ({ matches }) => nMapButton(matches, i));
+    }
+    function nMapButton(matches, num) {
+      // console.log(`nMapButton(${matches}, ${num})`);
+      // figure out which buttons to show -- up to num
+      if (matches) {
+        $("#livemap-navbar-button").toggleClass("d-none", (maps[num] & 1) == 0);
+        $("#acarshub-navbar-button").toggleClass("d-none", (maps[num] & 2) == 0);
+        $("#aiscatcher-navbar-button").toggleClass("d-none", (maps[num] & 4) == 0);
+        $("#radiosonde-navbar-button").toggleClass("d-none", (maps[num] & 8) == 0);
+      } else {
+        $("#livemap-navbar-button").toggleClass("d-none", (maps[num + 1] & 1) == 0);
+        $("#acarshub-navbar-button").toggleClass("d-none", (maps[num + 1] & 2) == 0);
+        $("#aiscatcher-navbar-button").toggleClass("d-none", (maps[num + 1] & 4) == 0);
+        $("#radiosonde-navbar-button").toggleClass("d-none", (maps[num + 1] & 8) == 0);
+      }
+    }
+    let smallButtons = window.matchMedia(`(max-width: ${breakpoints[0]})`);
+    let navCollapse = window.matchMedia(`(max-width: ${breakpoints[1]})`);
+    let tinyScreen = window.matchMedia(`(max-width: ${breakpoints[2]})`);
+    let noKofi = window.matchMedia(`(max-width: ${breakpoints[3]})`);
+    smallButtons.addEventListener("change", ({ matches }) => adjustButtonSize(matches));
+    navCollapse.addEventListener("change", ({ matches }) => navButtonCollapse(matches));
+    tinyScreen.addEventListener("change", ({ matches }) => adjustButtonFont(matches));
+    noKofi.addEventListener("change", ({ matches }) => removeKofi(matches));
+
+    function adjustButtonSize(matches) {
+      // console.log("adjustButtonSize: " + matches);
+      // find all buttons and adjust their size accordingly
+      $('.btn').each(function () {
+        $(this).toggleClass("btn-sm", matches);
+        $(this).css('font-size', matches ? '85%' : '');
+        $(this).css('--mdb-btn-padding-x', matches ? '0.75rem' : '1.5rem');
+      })
+      if (matches) {
+        $('#livemap-navbar-button-text').html('MAP');
+        $('#acarshub-navbar-button-text').html('ACARS');
+        $('#aiscatcher-navbar-button-text').html('AIS');
+        $('#radiosonde-navbar-button-text').html('SONDE');
+      } else {
+        $('#livemap-navbar-button-text').html('LIVE MAP');
+        $('#acarshub-navbar-button-text').html('ACARS HUB');
+        $('#aiscatcher-navbar-button-text').html('AIS CATCHER');
+        $('#radiosonde-navbar-button-text').html('SONDE');
+      }
+      $('#brand_text').toggleClass("d-none", matches);
+    }
+    function navButtonCollapse(matches) {
+      $("#navbar").toggleClass("navbar-expand", !matches)
+    }
+    function adjustButtonFont(matches) {
+      // loop over all submit buttons and add css font-size of 70% and smaller horizontal padding
+      // console.log("adjustButtonFont: " + matches);
+      $('.btn').each(function () {
+        if (!$(this).hasClass('nb-btn')) {
+          if (matches) {
+            $(this).css('font-size', '70%');
+            $(this).css('--mdb-btn-padding-x', '0.25rem')
+          } else {
+            $(this).css('font-size', '85%');
+            $(this).css('--mdb-btn-padding-x', '0.75rem')
+          }
+        }
+        if (matches) {
+          $('#livemap-navbar-button-text').html('');
+          $('#acarshub-navbar-button-text').html('');
+          $('#aiscatcher-navbar-button-text').html('');
+          $('#radiosonde-navbar-button-text').html('');
+        } else {
+          $('#livemap-navbar-button-text').html('MAP');
+          $('#acarshub-navbar-button-text').html('ACARS');
+          $('#aiscatcher-navbar-button-text').html('AIS');
+          $('#radiosonde-navbar-button-text').html('SONDE');
+        }
+      });
+    }
+
+    function removeKofi(matches) {
+      $("#kofi-navbar-button").toggleClass("d-none", matches);
+    }
+
+    // SVG icon loader with caching
+    // iconCache loaded from iconCache.js which is generated by cachebust.sh
+    // this is a bit of a hack to eliminates a bunch of http requests
+
+    async function loadIcon(iconName) {
+      if (iconCache[iconName]) {
+        return iconCache[iconName];
+      }
+
+      try {
+        const response = await fetch(`/static/icons/${iconName}.svg`);
+        if (response.ok) {
+          const svgContent = await response.text();
+          iconCache[iconName] = svgContent;
+          return svgContent;
+        }
+      } catch (error) {
+        console.warn(`Failed to load icon: ${iconName}`, error);
+      }
+
+      // Fallback to empty string if icon fails to load
+      return iconName;
+    }
+
+    // Preload all icons
+    async function preloadIcons() {
+      const iconNames = ['status-unknown', 'feed-connected', 'feed-disconnected', 'mlat-sync-error', 'feed-warning', 'overall-good', 'container-starting', 'container-down', 'adsb', 'acars', 'ais', 'sonde'];
+      const promises = iconNames.map(name => loadIcon(name));
+      await Promise.all(promises);
+    }
+
+    // Replace all icon placeholders with loaded SVGs
+    async function populateIconPlaceholders() {
+      const placeholders = document.querySelectorAll('.icon-placeholder');
+      for (const placeholder of placeholders) {
+        const iconName = placeholder.getAttribute('data-icon');
+        if (iconName) {
+          const iconSvg = await loadIcon(iconName);
+          placeholder.innerHTML = iconSvg;
+          placeholder.classList.remove('icon-placeholder');
+        }
+      }
+    }
+
+    $(document).ready(function () {
+      // Preload icons and populate placeholders when page loads
+      preloadIcons()
+        .then(() => populateIconPlaceholders())
+        .catch(err => console.log("Error loading icons:", err));
+      {% if not widget_mode %}
+      for (let i = 0; i < 4; i++) {
+        if (nMapButtons[i].matches) {
+          nMapButton(true, i);
+          break;
+        } else if (i == 3) {
+          nMapButton(false, 3)
+        }
+      }
+      adjustButtonSize(smallButtons.matches);
+      adjustButtonFont(tinyScreen.matches);
+      navButtonCollapse(navCollapse.matches);
+      removeKofi(noKofi.matches);
+
+      // Check for changelog popup
+      checkChangelogPopup();
+      {% else %}
+      // widget mode
+      {% endif %}
+    });
+    // widget_mode
+    //{{ endif }}
+
+    let tasks = [];
+    let timersActive = false;
+    let lastVisChange = 0;
+
+    function handleVisibilityChange() {
+      if (document.hidden && timersActive) {
+        verbose && console.log(new Date().toLocaleTimeString() + " visibility change: stopping tasks");
+        for (const task of tasks) {
+          clearTimeout(task.timer);
+        }
+        timersActive = false;
+      }
+      if (!document.hidden && !timersActive) {
+        let delay = 0;
+        if (Date.now() - lastVisChange < 20 * 1000) {
+          verbose && console.log(new Date().toLocaleTimeString() + " visibility change: starting tasks with short delay");
+          // delay before we run the tasks in case the tab was only recently put in the background
+          delay = 2 * 1000;
+        } else {
+          verbose && console.log(new Date().toLocaleTimeString() + " visibility change: starting tasks");
+          // extremely short delay before we run the tasks in case the tab will only be in the foreground for a split second
+          delay = 50;
+        }
+        for (const task of tasks) {
+          clearTimeout(task.timer);
+          task.timer = setTimeout(task.func, delay, { visibilityChange: true, })
+        }
+        timersActive = true;
+        lastVisChange = Date.now();
+      }
+    }
+
+    function registerTask(task) {
+      tasks.push(task);
+      if (timersActive) {
+        task.func();
+      }
+    }
+
+    function scheduleTask(task, delay) {
+      if (timersActive) {
+        clearTimeout(task.timer);
+        task.timer = setTimeout(task.func, delay);
+      }
+    }
+
+    $(function () {
+      // Warn if the browser doesn't support addEventListener or the Page Visibility API
+      if (typeof document.addEventListener === "undefined" || document.hidden === undefined) {
+        console.error("hidden tab handler requires a browser that supports the Page Visibility API.");
+        timersActive = true; // timers will always stay active
+      } else {
+        document.addEventListener("visibilitychange", handleVisibilityChange, false);
+      }
+
+      handleVisibilityChange();
+
+
+      {% if is_enabled('stage2') %}
+
+      let feederTarget = 0;
+      let parameters = location.search.substring(1).split('&');
+      for (let i = 0; i < parameters.length; i++) {
+        if (parameters[i].startsWith("m=")) {
+          feederTarget = parameters[i].split("=")[1];
+        }
+      }
+      console.log(`feederTarget: ${feederTarget}`);
+      let siteNames = [];
+      {% for site in env_value_by_tag('site_name') %}
+      siteNames.push('{{site}}');
+      {% endfor %}
+      siteName = feederTarget == 0 ? siteName = "Combined" : siteNames[feederTarget];
+      $("#navbarDropdownFeederSelection").text(`Target: ${siteName}`);
+      if (feederTarget > 0) {
+        let tag = "";
+        for (tag of ["live_traffic", "heatmap", "tracks", "replay"]) {
+          let oldhref = $("#" + tag).attr("href");
+          let newhref = oldhref.replace("/map/", "/map_" + feederTarget + "/");
+          $("#" + tag).attr("href", newhref);
+        }
+        $("#options").attr("href", "/visualization?m=" + feederTarget);
+        $("#data_sharing_current_link").attr("href", "/aggregators?m=" + feederTarget);
+        $("#data_sharing_current_link").off("click"); // jquery: remove all click event listeners
+        $("#stats_current").removeClass("d-none");
+        $("#stats_current").attr("href", "/stats_" + feederTarget + "/");
+        $("#stats_current").text(`${siteName} Stats`);
+      } else {
+        $("#data_sharing_current_link").attr("href", "");
+        $("#data_sharing_current_link").on("click", (event) => {
+          event.preventDefault();
+          alert("Please select a target site, Data Sharing is not available for combined data.");
+        });
+        $("#stats_current").addClass("d-none");
+      }
+
+      {% endif %}
+    }); // end of the $(function(){});
+
+    let check_mf_task = {};
+    check_mf_task.func = function () {
+
+      // you can comment this out this to permanently show the spinner for mobile testing for example
+      // show_spinner();
+
+      verbose && console.log(new Date().toLocaleTimeString() + " check_mf");
+      let url = "/api/stage2_stats";
+      fetch(url, {
+        method: "GET", cors: "no-cors", signal: AbortSignal.timeout(15000)
+      })
+        .then(response => { return response.json() })
+        .then(data => {
+          data.forEach((d, i) => {
+            let color_class = "text-danger";
+            let tooltip = "not receiving any data"
+            if (d["nosdr"] == 1) {
+              $("#mf_status_" + i).text("no SDR configured as data source");
+              $("#mf_stats_" + i).html("go to <a href='/sdr_setup'>SDR Setup</a> to address this");
+            } else if (d["pps"] > 0) {
+              color_class = "text-success";
+              tooltip = "receiving data (plane total since midnight UTC)"
+            } else if (d["uptime"] > 60) {
+              color_class = "text-warning";
+              tooltip = "receiving unusually little data"
+            }
+            $("#mf_status_" + i).removeClass("text-danger text-success text-warning");
+            $("#mf_status_" + i).addClass(color_class);
+            $("#mf_status_" + i).attr('title', tooltip);
+            $("#mf_stats_" + i).removeClass("text-danger text-success text-warning");
+            $("#mf_stats_" + i).addClass(color_class);
+            if (d["nosdr"] != 1) {
+              $("#mf_status_" + i).text(d["pps"] + " pos / " + d["mps"] + " msg per sec");
+              $("#mf_stats_" + i).text(d["planes"] + " planes / " + d["tplanes"] + " today");
+            }
+          })
+        })
+        .catch((err) => {
+          console.log("requested stage2_stats and got error: " + err);
+        });
+      scheduleTask(check_mf_task, 15000);
+    };
+
+    {% if is_enabled('temperature_block') %}
+    let temperatureTask = {};
+    let use_freedom_units = {% if is_enabled('freedom_units') %} 1 {% else %} 0 {% endif %}
+    function update_temperature_unit(freedom) {
+      use_freedom_units = freedom;
+      temperatureTask.func()
+    }
+    temperatureTask.func = function () {
+      let url = "/api/get_temperatures.json";
+      fetch(url, {
+        method: "GET", cors: "no-cors", signal: AbortSignal.timeout(15000)
+      })
+        .then(response => { return response.json() })
+        .then(data => {
+          update_temp_block(data["cpu"], data["ext"], data["age"]);
+        })
+        .catch((err) => {
+          console.log("requested temperatures and got error: " + err);
+        });
+      scheduleTask(temperatureTask, 15000);
+    }
+
+    function update_temp_block(cpu, ext, age) {
+      if (isNaN(age - 0)) {
+        age = 1
+      }
+      opacity = Math.min(1, 120 / (1 + age));
+      let current_theme = $("html").attr("data-mdb-theme");
+      let color_palette = {
+        "good": "green",
+        "warning": "orange",
+        "bad": "red"
+      };
+      if (current_theme == "dark") {
+        color_palette = {
+          "good": "lightgreen",
+          "warning": "yellow",
+          "bad": "lightred"
+        };
+      }
+      if (cpu != null) {
+        $("#cpu_temp_block").css('opacity', opacity);
+        $("#cpu_temp_block").removeClass('d-none');
+        if (use_freedom_units) {
+          cpu_text = Math.round(cpu * 1.8 + 32) + "°F";
+        } else {
+          cpu_text = cpu + "°C";
+        }
+        $("#cpu_temp").text(cpu_text);
+        if (cpu < 55) {
+          $("#cpu_temp").css('color', color_palette["good"]);
+        } else if (cpu < 80) {
+          $("#cpu_temp").css('color', color_palette["warning"]);
+        } else {
+          $("#cpu_temp").css('color', color_palette["bad"]);
+        }
+      } else {
+        $("#cpu_temp_block").addClass('d-none');
+      }
+      if (ext != null) {
+        $("#ext_temp_block").css('opacity', opacity);
+        $("#ext_temp_block").removeClass('d-none');
+        {% if is_enabled('freedom_units') %}
+        ext_text = Math.round(ext * 1.8 + 32) + "°F";
+        {% else %}
+        ext_text = ext + "°C";
+        {% endif %}
+        $("#ext_temp").text(ext_text);
+        if (ext < -10) {
+          $("#ext_temp").css('color', color_palette["warning"]);
+        } else if (ext < 40) {
+          $("#ext_temp").css('color', color_palette["good"]);
+        } else if (ext < 50) {
+          $("#ext_temp").css('color', color_palette["warning"]);
+        } else {
+          $("#ext_temp").css('color', color_palette["bad"]);
+        }
+      } else {
+        $("#ext_temp_block").addClass('d-none');
+      }
+    }
+
+    registerTask(temperatureTask);
+    {% endif %}
+
+    function show_spinner() {
+      document.getElementById("loader").style.display = "block";
+      document.getElementById("overlay").style.display = "block";
+      console.log('show_spinner');
+    }
+    function hide_spinner() {
+      document.getElementById("loader").style.display = "none";
+      document.getElementById("overlay").style.display = "none";
+      console.log('hide_spinner');
+    }
+    function stage2_feeder_target_submit(newTarget) {
+      if (newTarget == '*' || newTarget == '0' || newTarget == '' || newTarget == undefined) {
+        queryString = "";
+      } else {
+        queryString = "?m=" + newTarget;
+      }
+      location.replace(location.href.split('?')[0] + queryString);
+      return false;
+    }
+    {% if not widget_mode %}
+    function checkChangelogPopup() {
+      fetch('/api/check_changelog_status', {
+        method: 'GET',
+        cors: 'no-cors',
+        signal: AbortSignal.timeout(5000)
+      })
+        .then(response => response.json())
+        .then(data => {
+          if (data.show_changelog) {
+            showChangelogPopup(data.previous_version, data.new_version, data.changelog);
+          }
+        })
+        .catch(error => {
+          console.log('Error checking changelog status:', error);
+        });
+    }
+
+    function showChangelogPopup(oldVersion, newVersion, changelogContent) {
+      let changelog = changelogContent;
+
+      // Create modal HTML
+      const modalHtml = `
+          <div class="modal fade" id="changelogModal" tabindex="-1" aria-labelledby="changelogModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+              <div class="modal-content">
+                <div class="modal-header">
+                  <h5 class="modal-title" id="changelogModalLabel">Your Feeder Has Been Updated!</h5>
+                  <button type="button" class="btn-close" data-mdb-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                  <div class="mb-3">
+                    <strong>Updated from:</strong><span class="version-badge ms-2 ">${oldVersion}</span> <strong>to:</strong><span class="version-badge ms-2">${newVersion}</span>
+                  </div>
+                  <div class="changelog-content">
+                    <pre style="white-space: pre-wrap; font-family: inherit;">${changelog}</pre>
+                  </div>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-primary" data-mdb-dismiss="modal">Cool！😎</button>
+                </div>
+              </div>
+            </div>
+          </div>`;
+
+      // Add modal to body
+      $('body').append(modalHtml);
+
+      // Show modal
+      const changelogModal = new mdb.Modal(document.getElementById('changelogModal'));
+      changelogModal.show();
+
+      // Mark as seen when modal is hidden
+      $('#changelogModal').on('hidden.bs.modal', function () {
+        markChangelogSeen();
+        $(this).remove();
+      });
+    }
+
+    function markChangelogSeen() {
+      fetch('/api/mark_changelog_seen', {
+        method: 'POST',
+        cors: 'no-cors',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        signal: AbortSignal.timeout(5000)
+      })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            const changelogModal = mdb.Modal.getInstance(document.getElementById('changelogModal'));
+            if (changelogModal) {
+              changelogModal.hide();
+            }
+          } else {
+            console.log('Server error marking changelog as seen:', data.error || 'Unknown error');
+            const changelogModal = mdb.Modal.getInstance(document.getElementById('changelogModal'));
+            if (changelogModal) {
+              changelogModal.hide();
+            }
+          }
+        })
+        .catch(error => {
+          console.log('Error marking changelog as seen:', error);
+          const changelogModal = mdb.Modal.getInstance(document.getElementById('changelogModal'));
+          if (changelogModal) {
+            changelogModal.hide();
+          }
+        });
+    }
+
+    $(document).find('form').each((key, value) => {
+      if ("no_spinner" in value.className.split(" ")) return;
+      value.addEventListener("submit", (event) => { show_spinner(); });
+    });
+    $(document).ready(function () {
+      $('[data-toggle="tooltip"]').tooltip();
+
+      $("form").submit(function () {
+        // stupid hack to get checkboxes that are unchecked into Flask
+        // first hide the form (so the checkboxes don't visibly turn back on)
+        // then artificially check them all, but give them values of 0/1 to represent
+        // whether they were checked or not
+        var this_master = $(this);
+        this_master.hide();
+        this_master.find('input[type="checkbox"]').each(function () {
+          var checkbox_this = $(this);
+          if (checkbox_this.is(":checked") == true) {
+            checkbox_this.attr("value", "1");
+          } else {
+            checkbox_this.prop("checked", true);
+            checkbox_this.attr("value", "0");
+          }
+        });
+      });
+      // hack to fix the layout issues on iOS
+      let isIOS = /iPad|iPhone|iPod/.test(navigator.platform) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      if (isIOS) {
+        // loop over all elements with the class "col-11"
+        $('.col-11').each(function () {
+          // remove the class "col-11" and add the class "col-10"
+          $(this).removeClass('col-11').addClass('col-10');
+        })
+      }
+    });
+    // widget_mode
+    {% endif %}
+  </script>
+
+    {% block content %}{% endblock %}
+    {% if not widget_mode %}
+    <footer class="mt-5 py-4 border-top">
+      <div class="container px-0">
+        <div class="mb-3">
+          <div class="d-flex align-items-center mb-2">
+            {% if env_value_by_tag('aggregator_choice') == 'nonadsb' %}
+            <a href="https://sdre.im" target="_blank" rel="noopener" class="fw-semibold text-decoration-none">SDR Feeder Image</a>
+            {% else %}
+            <a href="https://adsb.im" target="_blank" rel="noopener" class="fw-semibold text-decoration-none">ADS-B Feeder Image</a>
+            {% endif %}
+            <span class="version-badge ms-2">{{ env_value_by_tag("base_version") }}</span>
+          </div>
+          <div class="text-muted small d-none d-md-block">
+            Running on {{ env_value_by_tag("board_name") }} • {{ env_value_by_tag("image_name") }}
+          </div>
+          <div class="text-muted small d-block d-md-none">
+            {{ env_value_by_tag("board_name") }}<br>{{ env_value_by_tag("image_name") }}
+          </div>
+          {% if env_value_by_tag('fqdn') %}
+          <div id="globalname" class="text-muted small d-block">
+          </div>
+          <div>
+            <br/><small>Most people with simple setups can connect to their feeder via
+              <a href="https://my.adsb.im">https://my.adsb.im</a></small>
+          </div>
+          {% endif %}
+
+          <div class="mt-3">
+            <a href="https://ko-fi.com/H2H2H3JS5" target="_blank" rel="noopener">
+              <img src="/static/images/kofi_button_stroke.png" alt="Help sustain this project at ko-fi.com" class="kofi-icon">
+            </a>
+          </div>
+        </div>
+        <div class="small text-muted">
+          Need help? Check the <a {% if env_value_by_tag('aggregator_choice') == 'nonadsb' %}
+          href="https://sdre.im/using" {% else %} href="https://adsb.im/using" {% endif %}
+          target="_blank" rel="noopener">documentation</a>, look at our
+          <a href="https://youtube.com/@adsb" target="_blank" rel="noopener">YouTube Channel</a>,
+          or join our community: <a href="https://adsblol.zulipchat.com/#narrow/stream/391168-adsb-feeder-image"
+              target="_blank" rel="noopener">Zulip Channel</a> • <a href="https://discord.gg/gducED2VC3"
+              target="_blank" rel="noopener">Discord Server</a>
+        </div>
+      </div>
+    </footer>
+    <!-- widget_mode -->
+    {% endif %}
+  </div>
+  <script>
+    async function get_global_url(hostname, port = 80) {
+      var url = `http://${hostname}${port !== 80 ? ':' + port : ''}/`;
+      try {
+        await fetch(url, {
+          method: 'HEAD',
+          mode: 'no-cors',
+          signal: AbortSignal.timeout(3000)
+        });
+        return url;
+      } catch {
+        return "";
+      }
+    }
+    $(document).ready(async function() {
+      var global_url = await get_global_url("{{ env_value_by_tag('fqdn') }}", {{ env_value_by_tag('webport') }} );
+      if (global_url != "") {
+        $("#globalname").html(`You can access this site on your local network as <a href="${global_url}">${global_url}</a>.`)
+      }
+    })
+  </script>
+</body>
+</html>

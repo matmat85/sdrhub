@@ -1,0 +1,199 @@
+#!/usr/bin/env python3
+"""
+Simple test to verify metrics module works correctly
+"""
+
+import tempfile
+from datetime import datetime, timedelta
+from pathlib import Path
+
+from metrics import TestMetrics
+
+
+def test_metrics():
+    """Test basic metrics functionality"""
+    # Use temporary database
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = Path(tmpdir) / "test-metrics.db"
+        metrics = TestMetrics(db_path=str(db_path))
+
+        # Test 1: Start a test
+        test_id = metrics.start_test(
+            image_url="https://example.com/image-v1.0.0-beta.1.img.xz",
+            triggered_by="manual",
+            trigger_source="test-script",
+            rpi_ip="192.168.1.100",
+        )
+
+        # Test 2: Update stages
+        metrics.update_stage(test_id, "download", "passed")
+        metrics.update_stage(test_id, "boot", "passed")
+        metrics.update_stage(test_id, "network", "passed")
+        metrics.update_stage(test_id, "browser_test", "passed")
+
+        # Test 3: Complete test
+        metrics.complete_test(test_id, "passed")
+
+        # Test 4: Query results
+        results = metrics.get_recent_results(limit=10)
+        assert len(results) == 1
+        assert results[0]["status"] == "passed"
+        assert results[0]["image_version"] == "v1.0.0-beta.1"
+
+        # Test 5: Get stats
+        stats = metrics.get_stats(days=7)
+        assert stats["total"] == 1
+        assert stats["passed"] == 1
+        assert stats["pass_rate"] == 100.0
+
+        # Test 6: Create a failed test
+        test_id2 = metrics.start_test(
+            image_url="https://example.com/image-v1.0.0-beta.2.img.xz",
+            triggered_by="webhook",
+            trigger_source="github",
+            rpi_ip="192.168.1.100",
+        )
+        metrics.update_stage(test_id2, "download", "passed")
+        metrics.update_stage(test_id2, "boot", "failed")
+        metrics.complete_test(test_id2, "failed", error_message="Boot timeout", error_stage="boot")
+
+        # Test 7: Query failures
+        failures = metrics.get_failures(limit=10)
+        assert len(failures) == 1
+        assert failures[0]["status"] == "failed"
+        assert failures[0]["error_message"] == "Boot timeout"
+
+        # Test 8: Updated stats
+        stats = metrics.get_stats(days=7)
+        assert stats["total"] == 2
+        assert stats["passed"] == 1
+        assert stats["failed"] == 1
+        assert stats["pass_rate"] == 50.0
+
+
+def test_check_duplicate_skips_when_release_id_none():
+    """Should return None immediately when release_id is None"""
+    metrics = TestMetrics(db_path=":memory:")
+
+    # Create a test to potentially match
+    metrics.start_test(image_url="https://example.com/test.img", github_release_id=123)
+
+    # Check with release_id=None should skip check entirely
+    result = metrics.check_duplicate(image_url="https://example.com/test.img", github_release_id=None)
+
+    assert result is None
+
+
+def test_check_duplicate_returns_none_when_no_match():
+    """Should return None when no matching records exist"""
+    metrics = TestMetrics(db_path=":memory:")
+
+    # Don't create any test records
+
+    result = metrics.check_duplicate(image_url="https://example.com/test.img", github_release_id=123)
+
+    assert result is None
+
+
+def test_check_duplicate_detects_recent_duplicate():
+    """Should detect duplicate within time window"""
+    metrics = TestMetrics(db_path=":memory:")
+
+    url = "https://example.com/test.img"
+    release_id = 456
+
+    # Create first test
+    test_id = metrics.start_test(image_url=url, github_release_id=release_id)
+
+    # Check for duplicate (should find it)
+    result = metrics.check_duplicate(url, release_id)
+
+    assert result is not None
+    assert result["test_id"] == test_id
+    assert result["minutes_ago"] == 0  # Just created
+    assert "started_at" in result
+
+
+def test_check_duplicate_ignores_old_duplicates():
+    """Should not detect duplicates outside time window"""
+    from unittest.mock import patch
+
+    metrics = TestMetrics(db_path=":memory:")
+
+    url = "https://example.com/test.img"
+    release_id = 789
+
+    # Create test with old timestamp (2 hours ago)
+    old_time = datetime.utcnow() - timedelta(hours=2)
+
+    with patch("metrics.datetime") as mock_datetime:
+        mock_datetime.utcnow.return_value = old_time
+        mock_datetime.fromisoformat = datetime.fromisoformat
+        metrics.start_test(image_url=url, github_release_id=release_id)
+
+    # Check for duplicate (should NOT find it - too old)
+    result = metrics.check_duplicate(url, release_id, window_hours=1)
+
+    assert result is None
+
+
+def test_check_duplicate_different_release_ids():
+    """Same URL with different release_id should not be duplicate"""
+    metrics = TestMetrics(db_path=":memory:")
+
+    url = "https://example.com/test.img"
+
+    # Create test with release_id=100
+    metrics.start_test(image_url=url, github_release_id=100)
+
+    # Check with different release_id=200
+    result = metrics.check_duplicate(url, github_release_id=200)
+
+    assert result is None  # Not a duplicate
+
+
+def test_duration_reflects_execution_time_not_queue_time():
+    """Duration should reflect actual execution time, not queue wait time"""
+    import time
+    from unittest.mock import patch
+
+    metrics = TestMetrics(db_path=":memory:")
+
+    # Simulate: Test queued at time T
+    queue_time = datetime.now(tz=None)
+    with patch("metrics.datetime") as mock_datetime:
+        mock_datetime.utcnow.return_value = queue_time
+        mock_datetime.fromisoformat = datetime.fromisoformat
+        test_id = metrics.start_test(
+            image_url="https://example.com/test.img",
+            triggered_by="api",
+        )
+
+    # Simulate: Test sits in queue for 5 seconds
+    time.sleep(0.1)  # Small sleep to ensure time difference
+    execution_start_time = queue_time + timedelta(seconds=5)
+
+    # Simulate: Test starts executing at time T+5s
+    with patch("metrics.datetime") as mock_datetime:
+        mock_datetime.utcnow.return_value = execution_start_time
+        mock_datetime.fromisoformat = datetime.fromisoformat
+        metrics.update_test_status(test_id, "running")
+
+    # Simulate: Test runs for 3 seconds
+    completion_time = execution_start_time + timedelta(seconds=3)
+
+    # Simulate: Test completes at time T+8s
+    with patch("metrics.datetime") as mock_datetime:
+        mock_datetime.utcnow.return_value = completion_time
+        mock_datetime.fromisoformat = datetime.fromisoformat
+        metrics.complete_test(test_id, "passed")
+
+    # Verify: Duration should be 3 seconds (execution time), not 8 seconds (queue + execution)
+    results = metrics.get_recent_results(limit=1)
+    assert len(results) == 1
+
+    duration = results[0]["duration_seconds"]
+    started_at = datetime.fromisoformat(results[0]["started_at"])
+
+    assert duration == 3, f"Expected duration 3s (execution time), got {duration}s"
+    assert started_at == execution_start_time, "Expected started_at to be execution start time"

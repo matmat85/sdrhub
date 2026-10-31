@@ -1,0 +1,69 @@
+#!/bin/bash
+
+# this needs to run as root
+if [ $(id -u) != "0" ] ; then
+    echo "this command requires superuser privileges - please run as sudo bash $0"
+    exit 1
+fi
+
+cd /opt/adsb
+TIME=$(date -Iseconds)
+
+# this shell script no longer changes or downloads docker.image.versions, this only happens during feeder-update
+# it now merely pulls the container versions as set in config.json / .env
+
+echo "$(date -u +"%FT%T.%3NZ") pulling new container images and restarting docker" >> /run/adsb-feeder-image.log
+bash /opt/adsb/docker-compose-start
+# there is no need to docker pull with pinned versions, compose up will pull if the pinned version does not exist
+# if the pinned version is already present a compose up will be much quicker as it does not need to talk to the
+# container registry
+# but if something failed, run the docker pull for good measure:
+if [[ -f /opt/adsb/state/compose_up_failed ]]; then
+    bash ./docker-pull.sh
+    bash /opt/adsb/docker-compose-start
+fi
+
+# finally remove the images and files we no longer use
+
+# https://docs.docker.com/config/pruning/ says: A dangling image is one that isn't tagged, and isn't referenced by any container.
+# pretty much all old images we have are tagged so they wouldn't be removed without -a
+# but -a also removes current images of for example deactived feed containers
+# thus we manually create a list of images that are neither running nor in docker.image.versions
+# alert: the following code relies on non quoted bash expansion
+PRUNE_LIST=$( \
+    docker images -a --format "{{.Repository}}:{{.Tag}}" \
+    | grep -F -v -e '<none>' \
+        -f <(docker ps -a --format '{{.Image}}') \
+        -f <(cut -d= -f2 /opt/adsb/docker.image.versions) \
+)
+if ! [ -f os.adsb.feeder.image ]; then
+    # if running as an app, restrict pruned images to images used by adsb.im
+    PRUNE_LIST=$( echo "$PRUNE_LIST" |
+        grep -F -f <(cut -d= -f2 /opt/adsb/docker.image.versions | cut -d: -f1) \
+    )
+fi
+# remove images we use that don't have a tag:
+PRUNE_LIST_NOTAG=$(docker images -a \
+        | grep -F -f <(cut -d= -f2 /opt/adsb/docker.image.versions | cut -d: -f1) \
+        | awk '{ if ($2 == "<none>") print $3 }' \
+)
+
+# combine variables preserving newlines:
+PRUNE_LIST=$(echo "$PRUNE_LIST"; echo "$PRUNE_LIST_NOTAG")
+
+# then all images on this prune list are deleted
+if [[ -n "$PRUNE_LIST" ]]; then
+    echo "PRUNING:"
+    echo "$PRUNE_LIST"
+    if [[ -f /opt/adsb/noprune ]]; then
+        echo NOT actually PRUNING due to flag file /opt/adsb/noprune being present
+    else
+        docker rmi $PRUNE_LIST # unquoted expansion required
+    fi
+fi
+echo "PRUNING DONE"
+
+
+sed -i "s/CONTAINER_VERSION=.*/CONTAINER_VERSION=$TIME/" /opt/adsb/config/.env
+
+echo "$(date -Iseconds): done"

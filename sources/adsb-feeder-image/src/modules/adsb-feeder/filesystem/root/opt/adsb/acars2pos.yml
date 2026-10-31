@@ -1,0 +1,15 @@
+services:
+  acars2pos:
+    container_name: acars2pos
+    hostname: acars2pos
+    image: ${ACARS2POS_CONTAINER}
+    healthcheck:
+      disable: true
+    restart: unless-stopped
+    networks:
+      - adsb_im_bridge
+    environment:
+      - JSON_IN=acars_router:15550;acars_router:15555;acars_router:15556
+      - SBS_OUT=ultrafeeder:32009
+      # USER_PROVIDED_ENV_START
+      # USER_PROVIDED_ENV_END

@@ -1,0 +1,49 @@
+{% extends "generic/section_small.html" %}
+{% block section_title %}Live FM / DAB radio{% endblock %}
+{% block section_content %}
+<p>Current mode: <strong>{{ state.mode }}</strong>. ADS-B stays on the first radio.
+    Listening pauses scanning on the second radio. Use Resume scanning when finished.</p>
+<form method="post">
+    {% csrf_token %}
+    <label for="mode">Mode</label>
+    <select class="form-select" id="mode" name="mode">
+        <option value="fm" {% if state.mode == "fm" %}selected{% endif %}>Broadcast FM (mono)</option>
+        <option value="dab" {% if state.mode == "dab" %}selected{% endif %}>DAB / DAB+</option>
+    </select>
+    <label for="frequency">FM frequency (MHz, 87.5-108)</label>
+    <input class="form-control" id="frequency" name="frequency" type="number" min="87.5" max="108" step="0.001" value="{{ frequency }}">
+    <label for="channel">DAB multiplex channel</label>
+    <select class="form-select" id="channel" name="channel">
+        {% for channel in channels %}
+        <option {% if state.channel == channel %}selected{% endif %}>{{ channel }}</option>
+        {% endfor %}
+    </select>
+    <button class="btn btn-primary mt-2" type="submit">Tune radio</button>
+</form>
+<form method="post" class="mt-2">
+    {% csrf_token %}
+    <input type="hidden" name="mode" value="scan">
+    <button class="btn btn-secondary" type="submit">Resume scanning</button>
+</form>
+{% if state.running %}
+    {% if state.mode == "fm" %}
+    <h5 class="mt-3">FM audio</h5>
+    <audio controls src="{% url 'sdr_fm_stream' %}"></audio>
+    <p>One live FM listener at a time. Audio is mono, with 75 microsecond de-emphasis.</p>
+    {% elif state.mode == "dab" %}
+    <h5 class="mt-3">DAB services on {{ state.channel }}</h5>
+    <a href="{% url 'sdr_radio' %}">Refresh station list</a>
+    {% for station in stations %}
+    <div class="mt-2"><strong>{{ station.label }}</strong>
+        <audio controls preload="none" src="{% url 'sdr_dab_stream' station.sid %}"></audio>
+    </div>
+    {% empty %}
+    <p>No audio services found yet. Wait a few seconds and refresh. Check antenna,
+        multiplex channel and Wi-Fi if the list stays empty.</p>
+    {% endfor %}
+    <p>DAB requires a continuous ~33 Mbps raw stream over Wi-Fi.</p>
+    {% endif %}
+{% endif %}
+<p>Audio controls report stream failures; receiver details are in radio_player.log.
+    Only receive broadcasts you are legally permitted to listen to.</p>
+{% endblock %}

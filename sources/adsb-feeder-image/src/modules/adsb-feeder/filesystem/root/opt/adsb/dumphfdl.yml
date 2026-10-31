@@ -1,0 +1,36 @@
+services:
+  dumphfdl:
+    image: ${DUMPHFDL_CONTAINER}
+    container_name: dumphfdl
+    hostname: dumphfdl
+    healthcheck:
+      disable: true
+    restart: unless-stopped
+    networks:
+      - adsb_im_bridge
+    environment:
+      - TZ=${FEEDER_TZ}
+      - SOAPYSDRDRIVER=${HFDL_SDR_STRING}
+      - GAIN_TYPE=${HFDL_GAIN_TYPE}
+      - GAIN=${HFDL_GAIN}
+      - SOAPYSAMPLERATE=${HFDL_SAMPLERATE:-768000}
+      - FEED_ID=${HFDL_FEED_ID}
+      - FREQUENCIES=${HFDL_FREQUENCIES}
+      - ZMQ_MODE=server
+      - ZMQ_ENDPOINT=tcp://0.0.0.0:45555
+      - SERVER=acars_router
+      - SERVER_PORT=5556
+      # output SBS data to the ultrafeeder map
+      - DUMP_HFDL_COMMAND_EXTRA=--output decoded:basestation:tcp:address=ultrafeeder,port=32009
+      # USER_PROVIDED_ENV_START
+      # USER_PROVIDED_ENV_END
+    tmpfs:
+      - /run:exec,size=64M
+      - /var/log
+      - /tmp
+    device_cgroup_rules:
+      - "c 189:* rwm"
+    volumes:
+      - /dev/bus/usb:/dev/bus/usb:ro
+      - /opt/adsb/data/dumphfdl-data:/opt/dumphfdl
+      - /opt/adsb/data/dumphfdl-scanner:/opt/scanner

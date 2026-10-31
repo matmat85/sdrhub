@@ -1,0 +1,25 @@
+[Unit]
+Description=ADS-B Feeder Docker Service
+After=docker.service network-online.target adsb-setup.service
+PartOf=docker.service
+
+[Service]
+SyslogIdentifier=adsb-docker
+WorkingDirectory=/opt/adsb
+ExecStartPre=-/bin/bash -c "mount -o remount,exec,size=$(( $(cat /proc/meminfo | grep -i 'memtotal' | grep -o '[[:digit:]]*') / 2 ))k /run"
+ExecStartPre=-/bin/bash -c "[[ -f /opt/adsb/os.adsb.feeder.image ]] && echo 128 > /sys/module/usbcore/parameters/usbfs_memory_mb"
+ExecStartPre=-/opt/adsb/scripts/fix-docker-network
+ExecStart=/opt/adsb/docker-compose-start
+ExecStop=/opt/adsb/docker-compose-adsb stop -t 30
+ExecStopPost=-/opt/adsb/scripts/run-to-disk.sh
+RemainAfterExit=yes
+RestartSec=30min
+TimeoutStartSec=10min
+TimeoutStopSec=2min
+Restart=always
+StandardOutput=append:/run/adsb-feeder-image.log
+StandardError=append:/run/adsb-feeder-image.log
+
+
+[Install]
+WantedBy=multi-user.target

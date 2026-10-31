@@ -1,0 +1,10 @@
+#!/bin/bash
+
+# Every container startup resumes scanning, not a stale radio-listening session.
+rm -f /var/run/sdr/radio.json
+
+ID_FILE="/var/run/sdr/sdr-scanner-id"
+if [ ! -f "$ID_FILE" ]; then
+    echo "Not found scanner ID file - generating a new"
+    openssl rand -hex 8 >$ID_FILE
+fi

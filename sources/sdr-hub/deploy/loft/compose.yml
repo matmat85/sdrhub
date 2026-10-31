@@ -1,0 +1,20 @@
+services:
+  sdr-hub:
+    image: "${SDR_HUB_IMAGE:-loft/sdr-hub:local}"
+    restart: unless-stopped
+    ports:
+      - "${LXC_BIND_ADDRESS:?Set LXC_BIND_ADDRESS in .env}:8000:80"
+    environment:
+      TZ: "${TZ:-Etc/UTC}"
+      HTTP_USER: admin
+      HTTP_PASSWORD: "${SDR_HTTP_PASSWORD:?Set a unique SDR_HTTP_PASSWORD in .env}"
+      MQTT_USER: admin
+      MQTT_PASSWORD: "${SDR_MQTT_PASSWORD:?Set a unique SDR_MQTT_PASSWORD in .env}"
+    volumes:
+      - ./data:/app/data
+      - ./logs:/var/log/sdr
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

@@ -1,0 +1,149 @@
+# assemble the docker compose files we want to use
+# this needs to be extended for each new aggregator
+
+COMPOSE_FILES=( "-f" "/opt/adsb/config/dozzle.yml" )
+
+if [ -f /opt/adsb/config/.env ] ; then
+    if grep "AF_IS_AIRSPY_ENABLED=True" /opt/adsb/config/.env > /dev/null 2>&1 ; then
+        COMPOSE_FILES+=( "-f" "/opt/adsb/config/airspy.yml" )
+    fi
+    if grep "AF_IS_SDRPLAY_ENABLED=True" /opt/adsb/config/.env > /dev/null 2>&1 && \
+        grep "AF_IS_SDRPLAY_LICENSE_ACCEPTED=True" /opt/adsb/config/.env > /dev/null 2>&1 ; then
+        COMPOSE_FILES+=( "-f" "/opt/adsb/config/sdrplay.yml" )
+    fi
+    if grep "FEEDER_ENABLE_UAT978=True" /opt/adsb/config/.env > /dev/null 2>&1 ; then
+        COMPOSE_FILES+=( "-f" "/opt/adsb/config/uat978.yml" )
+    fi
+    if grep "_ADSBIM_AGGREGATORS_SELECTION=nano" /opt/adsb/config/.env > /dev/null 2>&1 ; then
+        COMPOSE_FILES+=( "-f" "/opt/adsb/config/nanofeeder.yml" )
+    else
+        if grep "AF_IS_STAGE2=False" /opt/adsb/config/.env > /dev/null 2>&1 ; then
+            COMPOSE_FILES+=( "-f" "/opt/adsb/config/docker-compose.yml" )
+        fi
+    fi
+    if ! grep "_ADSBIM_AGGREGATORS_SELECTION=micro" /opt/adsb/config/.env > /dev/null 2>&1 ; then
+        # for each of the yml snippets check if this aggregator is enabled
+        # in the .env file
+        if grep "AF_IS_FLIGHTRADAR24_ENABLED=True" /opt/adsb/config/.env > /dev/null 2>&1 ; then
+            COMPOSE_FILES+=( "-f" "/opt/adsb/config/fr24.yml" )
+        fi
+        if grep "AF_IS_PLANEWATCH_ENABLED=True" /opt/adsb/config/.env > /dev/null 2>&1 ; then
+            COMPOSE_FILES+=( "-f" "/opt/adsb/config/pw.yml" )
+        fi
+        if grep "AF_IS_FLIGHTAWARE_ENABLED=True" /opt/adsb/config/.env > /dev/null 2>&1 ; then
+            COMPOSE_FILES+=( "-f" "/opt/adsb/config/fa.yml" )
+        fi
+        if grep "AF_IS_RADARBOX_ENABLED=True" /opt/adsb/config/.env > /dev/null 2>&1 ; then
+            COMPOSE_FILES+=( "-f" "/opt/adsb/config/rb.yml" )
+        fi
+        if grep "AF_IS_PLANEFINDER_ENABLED=True" /opt/adsb/config/.env > /dev/null 2>&1 ; then
+            COMPOSE_FILES+=( "-f" "/opt/adsb/config/pf.yml" )
+        fi
+        if grep "AF_IS_ADSBHUB_ENABLED=True" /opt/adsb/config/.env > /dev/null 2>&1 ; then
+            COMPOSE_FILES+=( "-f" "/opt/adsb/config/ah.yml" )
+        fi
+        if grep "AF_IS_OPENSKY_ENABLED=True" /opt/adsb/config/.env > /dev/null 2>&1 ; then
+            COMPOSE_FILES+=( "-f" "/opt/adsb/config/os.yml" )
+        fi
+        if grep "AF_IS_RADARVIRTUEL_ENABLED=True" /opt/adsb/config/.env > /dev/null 2>&1 ; then
+            COMPOSE_FILES+=( "-f" "/opt/adsb/config/rv.yml" )
+        fi
+        if grep "AF_IS_1090UK_ENABLED=True" /opt/adsb/config/.env > /dev/null 2>&1 ; then
+            COMPOSE_FILES+=( "-f" "/opt/adsb/config/1090uk.yml" )
+        fi
+        if grep "AF_IS_SDRMAP_ENABLED=True" /opt/adsb/config/.env > /dev/null 2>&1 ; then
+            COMPOSE_FILES+=( "-f" "/opt/adsb/config/sdrmap.yml" )
+        fi
+        # finally, check if this is a stage 2 setup and enable all of the ultrafeeders
+        if grep "AF_IS_STAGE2=True" /opt/adsb/config/.env > /dev/null 2>&1 ; then
+
+            COMPOSE_FILES+=( "-f" "/opt/adsb/config/webproxy.yml" "-f" "/opt/adsb/config/stage2_main.yml" )
+
+            # do we have a local SDR -- if yes, start the nanofeeder container for it
+            if grep "AF_STAGE2_NANOFEEDER=True" /opt/adsb/config/.env > /dev/null 2>&1 ; then
+                COMPOSE_FILES+=( "-f" "/opt/adsb/config/nanofeeder.yml" )
+            fi
+            if grep "AF_STAGE2_NANOFEEDER_2=True" /opt/adsb/config/.env > /dev/null 2>&1 ; then
+                COMPOSE_FILES+=( "-f" "/opt/adsb/config/nanofeeder_2.yml" )
+            fi
+            # stage 2 feeder, look through the various containers
+            NUM=$(grep AF_NUM_MICRO_SITES= /opt/adsb/config/.env | sed -n 's/.*=\([0-9]\+\).*/\1/p')
+            for ((i = 1; i <= NUM; i++)); do
+                COMPOSE_FILES+=( "-f" "/opt/adsb/config/stage2_micro_site_${i}.yml" )
+                if grep "AF_IS_FLIGHTRADAR24_ENABLED_${i}=True" /opt/adsb/config/.env > /dev/null 2>&1 ; then
+                    COMPOSE_FILES+=( "-f" "/opt/adsb/config/fr24_${i}.yml" )
+                fi
+                if grep "AF_IS_PLANEWATCH_ENABLED_${i}=True" /opt/adsb/config/.env > /dev/null 2>&1 ; then
+                    COMPOSE_FILES+=( "-f" "/opt/adsb/config/pw_${i}.yml" )
+                fi
+                if grep "AF_IS_FLIGHTAWARE_ENABLED_${i}=True" /opt/adsb/config/.env > /dev/null 2>&1 ; then
+                    COMPOSE_FILES+=( "-f" "/opt/adsb/config/fa_${i}.yml" )
+                fi
+                if grep "AF_IS_RADARBOX_ENABLED_${i}=True" /opt/adsb/config/.env > /dev/null 2>&1 ; then
+                    COMPOSE_FILES+=( "-f" "/opt/adsb/config/rb_${i}.yml" )
+                fi
+                if grep "AF_IS_PLANEFINDER_ENABLED_${i}=True" /opt/adsb/config/.env > /dev/null 2>&1 ; then
+                    COMPOSE_FILES+=( "-f" "/opt/adsb/config/pf_${i}.yml" )
+                fi
+                if grep "AF_IS_ADSBHUB_ENABLED_${i}=True" /opt/adsb/config/.env > /dev/null 2>&1 ; then
+                    COMPOSE_FILES+=( "-f" "/opt/adsb/config/ah_${i}.yml" )
+                fi
+                if grep "AF_IS_OPENSKY_ENABLED_${i}=True" /opt/adsb/config/.env > /dev/null 2>&1 ; then
+                    COMPOSE_FILES+=( "-f" "/opt/adsb/config/os_${i}.yml" )
+                fi
+                if grep "AF_IS_RADARVIRTUEL_ENABLED_${i}=True" /opt/adsb/config/.env > /dev/null 2>&1 ; then
+                    COMPOSE_FILES+=( "-f" "/opt/adsb/config/rv_${i}.yml" )
+                fi
+                if grep "AF_IS_1090UK_ENABLED_${i}=True" /opt/adsb/config/.env > /dev/null 2>&1 ; then
+                    COMPOSE_FILES+=( "-f" "/opt/adsb/config/1090uk_${i}.yml" )
+                fi
+                if grep "AF_IS_SDRMAP_ENABLED_${i}=True" /opt/adsb/config/.env > /dev/null 2>&1 ; then
+                    COMPOSE_FILES+=( "-f" "/opt/adsb/config/sdrmap_${i}.yml" )
+                fi
+            done
+        fi
+    fi
+    if grep "AF_IS_ACARSHUB_ENABLED=True" /opt/adsb/config/.env > /dev/null 2>&1 ; then
+        COMPOSE_FILES+=( "-f" "/opt/adsb/config/acarshub.yml" )
+    fi
+    if grep "AF_RUN_ACARSDEC=True" /opt/adsb/config/.env > /dev/null 2>&1 ; then
+        COMPOSE_FILES+=( "-f" "/opt/adsb/config/acarsdec.yml" )
+    fi
+    if grep "AF_RUN_ACARSDEC2=True" /opt/adsb/config/.env > /dev/null 2>&1 ; then
+        COMPOSE_FILES+=( "-f" "/opt/adsb/config/acarsdec2.yml" )
+    fi
+    if grep "AF_IS_ACARS_ROUTER_ENABLED=True" /opt/adsb/config/.env > /dev/null 2>&1 ; then
+        COMPOSE_FILES+=( "-f" "/opt/adsb/config/acars_router.yml" )
+    fi
+    if grep "AF_IS_ACARS2POS_ENABLED=True" /opt/adsb/config/.env > /dev/null 2>&1 ; then
+        COMPOSE_FILES+=( "-f" "/opt/adsb/config/acars2pos.yml" )
+    fi
+    if grep "AF_RUN_DUMPVDL2=True" /opt/adsb/config/.env > /dev/null 2>&1 ; then
+        COMPOSE_FILES+=( "-f" "/opt/adsb/config/dumpvdl2.yml" )
+    fi
+    if grep "AF_RUN_DUMPHFDL=True" /opt/adsb/config/.env > /dev/null 2>&1 ; then
+        COMPOSE_FILES+=( "-f" "/opt/adsb/config/dumphfdl.yml" )
+    fi
+    if grep "AF_RUN_HFDLOBSERVER=True" /opt/adsb/config/.env > /dev/null 2>&1 ; then
+        COMPOSE_FILES+=( "-f" "/opt/adsb/config/hfdlobserver.yml" )
+    fi
+    if grep "AF_RUN_SHIPFEEDER=True" /opt/adsb/config/.env > /dev/null 2>&1 ; then
+        COMPOSE_FILES+=( "-f" "/opt/adsb/config/shipfeeder.yml" )
+    fi
+    if grep "AF_RUN_RADIOSONDE=True" /opt/adsb/config/.env > /dev/null 2>&1 && [ -f /opt/adsb/radiosonde/station.cfg ] ; then
+        COMPOSE_FILES+=( "-f" "/opt/adsb/config/radiosonde.yml" )
+    fi
+    if grep "AF_TELEGRAF_ADSB=True" /opt/adsb/config/.env > /dev/null 2>&1; then
+        COMPOSE_FILES+=( "-f" "/opt/adsb/config/telegraf_adsb.yml" )
+    fi
+    if grep "AF_IS_SKYSTATS_DB_ENABLED=True" /opt/adsb/config/.env > /dev/null 2>&1; then
+        COMPOSE_FILES+=( "-f" "/opt/adsb/config/skystats-db.yml" )
+    fi
+    if grep "AF_IS_SKYSTATS_ENABLED=True" /opt/adsb/config/.env > /dev/null 2>&1; then
+        if grep "AF_IS_SKYSTATS_DB_ENABLED=True" /opt/adsb/config/.env > /dev/null 2>&1; then
+            COMPOSE_FILES+=( "-f" "/opt/adsb/config/skystats.yml" )
+        else
+            COMPOSE_FILES+=( "-f" "/opt/adsb/config/skystats-remotedb.yml" )
+        fi
+    fi
+fi

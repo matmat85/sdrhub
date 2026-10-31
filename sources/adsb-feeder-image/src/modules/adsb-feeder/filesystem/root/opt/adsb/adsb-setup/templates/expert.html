@@ -1,0 +1,361 @@
+{% extends 'base.html' %}
+{% set active_page = "expert" %}
+
+{% block content %}
+<h1 class="mt-3 text-center text-danger">{% block title %} Expert Setup {% endblock %}</h1>
+<div>
+  {% with messages = get_flashed_messages() %}
+  {% if messages %}
+  {% for message in messages %}
+  <div class="alert alert-warning">
+    {{ message }}
+  </div>
+  {% endfor %}
+  {% endif %}
+  {% endwith %}
+</div>
+<div class="row small">
+  <div class="col-12 col-lg-6">
+    <h5 class="mt-4">Add additional Ultrafeeder arguments</h5>
+    <form method="POST">
+      <div class="row align-items-center">
+        <div class="col-12 mb-2">
+          <label for="ultrafeeder_extra_args">
+            There are very few circumstances where this is something you want to manually add. One might be a
+            situation where you want to feed an aggregator that uses the 'standard' format of all the account-less
+            aggregators, but that isn't supported out of the box.
+            <br>Add the configuration that you need here - it will be appended to the Ultrafeeder config.
+            <br>Example: adsb,feed.adsb.xyz,30004,beast_reduce_plus_out;
+            <br>Example with uuid: adsb,feed.adsb.xyz,30004,beast_reduce_plus_out,uuid=a67c44ce-[...];
+            <br>Example for mlat: mlat,feed.adsb.xyz,31009;
+            <br>Make sure to end each entry / line with a semicolon (;)
+          </label>
+        </div>
+        {% if is_enabled('stage2') %}
+        <div class="col-12 mb-2">Stage2: applied to all microsite ultrafeeder instances (SITENUM is replaced with 00, 01, 02 and so forth):</div>
+        <div class="col-12">
+          <textarea class="mx-auto w-100" id="ultrafeeder_extra_args_microsites" name="ultrafeeder_extra_args_microsites" rows="10"
+                    placeholder="adsb,feed.adsb.xyz,234SITENUM,beast_reduce_plus_out"
+                    >{{ env_value_by_tag('ultrafeeder_extra_args_microsites') }}</textarea>
+        </div>
+        <div class="col-4">
+          <button type="submit" class="btn btn-primary mx-auto w-100" name="ultrafeeder_extra_args_microsites--submit"
+                  value="go">Apply</button>
+        </div>
+        <div class="col-12 mb-2">Stage2: applied to the ultrafeeder instance with combined data:</div>
+        <div class="col-12">
+          <textarea class="mx-auto w-100" id="ultrafeeder_extra_args" name="ultrafeeder_extra_args" rows="10"
+                    placeholder="adsb,feed.adsb.xyz,30004,beast_reduce_plus_out"
+                    >{{ env_value_by_tag('ultrafeeder_extra_args') }}</textarea>
+        </div>
+        <div class="col-4">
+          <button type="submit" class="btn btn-primary mx-auto w-100" name="ultrafeeder_extra_args--submit"
+                  value="go">Apply</button>
+        </div>
+        {% else %}
+        <div class="col-12">
+          <textarea class="mx-auto w-100" id="ultrafeeder_extra_args" name="ultrafeeder_extra_args" rows="10"
+                    placeholder="adsb,feed.adsb.xyz,30004,beast_reduce_plus_out"
+                    >{{ env_value_by_tag('ultrafeeder_extra_args') }}</textarea>
+        </div>
+        <div class="col-4">
+          <button type="submit" class="btn btn-primary mx-auto w-100" name="ultrafeeder_extra_args--submit"
+                  value="go">Apply</button>
+        </div>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+  <div class="col-12 col-lg-6">
+    <h5 class="mt-4">Add environment variables to containers</h5>
+    <form method="POST">
+      <div class="row align-items-center">
+        <div class="col-12 mb-2">
+          <label for="ultrafeeder_extra_env">
+            The various Docker containers support a lot more environment variables than are exposed here in
+            the UI. If there are settings that you need to add, this is the best place to do it. Please only use this if
+            you understand what you are doing. It's reasonably simple to break your setup by inserting things here that
+            cause the container not to start.<br />
+            Please enter them one per line, with an equals sign separating the variable name from its value. The name
+            spaces for the different containers are distinct, so for simplicity they are all just added here together.
+          </label>
+        </div>
+        <div class="col-12">
+          <textarea class="mx-auto w-100" id="ultrafeeder_extra_env" name="ultrafeeder_extra_env" rows="10"
+                    placeholder="READSB_RTLSDR_PPM=22&#13;&#10;READSB_RANGE_OUTLINE_HOURS=72">{{ env_value_by_tag('ultrafeeder_extra_env') }}</textarea>
+        </div>
+        <div class="col-4">
+          <button type="submit" class="btn btn-primary mx-auto w-100" name="ultrafeeder_extra_env--submit"
+                  value="go">Apply</button>
+        </div>
+      </div>
+    </form>
+  </div>
+  <div class="col-12 col-lg-6">
+    <h5 class="mt-4">Add arguments to map URLs</h5>
+    <form method="POST">
+      <div class="row align-items-center">
+        <div class="col-12 mb-2">
+          <label for="tar1090_query_params">
+            tar1090, the software used to create the map display used here, contains a plethora of URL <a
+               href="https://github.com/wiedehopf/tar1090/blob/master/README-query.md">query parameters</a>. If you have
+            preferred query parameters that you always want to use, you can add them here.
+          </label>
+        </div>
+        <div class="col-8">
+          <input class="mx-auto w-100" id="tar1090_query_params" name="tar1090_query_params" type="text"
+                 placeholder="?autoselect&centerReceiver" value="{{ env_value_by_tag('tar1090_query_params') }}">
+        </div>
+        <div class="col-4">
+          <button type="submit" class="btn btn-primary mx-auto w-100" name="tar1090_query_params--submit"
+                  value="go">Apply</button>
+        </div>
+      </div>
+    </form>
+  </div>
+  {% if is_enabled('has_gpsd') %}
+  {% if is_enabled('use_gpsd') %}
+  <div class="col-12 col-lg-6">
+    <h5 class="mt-4">GPS based location</h5>
+    <form method="POST">
+      <div class="row align-items-center">
+        <div class="col-8">
+          <label for="turn_off_gpsd">
+            Select this to stop using GPS derived location data.
+          </label>
+        </div>
+        <div class="col-4">
+          <button type="submit" class="btn btn-primary mx-auto w-100" name="turn_off_gpsd" value="go">Update
+            Settings</button>
+        </div>
+      </div>
+    </form>
+  </div>
+  {% else %}
+  <div class="col-12 col-lg-6">
+    <h5 class="mt-4">GPS based location</h5>
+    <form method="POST">
+      <div class="row align-items-center">
+        <div class="col-8">
+          <label for="turn_on_gpsd">
+            You appear to have gpsd installed and configured. Select this to use GPS derived location data.
+          </label>
+        </div>
+        <div class="col-4">
+          <button type="submit" class="btn btn-primary mx-auto w-100" name="turn_on_gpsd" value="go">Update
+            Settings</button>
+        </div>
+      </div>
+    </form>
+  </div>
+  {% endif %}
+  {% endif %}
+  {% if env_value_by_tag('tar1090_image_config_link') != '' %}
+  <div class="col-12 col-lg-6">
+    <h5 class="mt-4">Don't show config link on map page</h5>
+    <form method="POST" onsubmit="show_spinner(); return true;">
+      <div class="row align-items-center">
+        <div class="col-8">
+          <label for="no_config_link">If you want to share ONLY the map / statistics with others, but don't want to show
+            them the link to the adsb.im feeder image home page (which allows them to change the configuration), you can
+            disable it here. Please note that the user still can simply access that page by changing the port that they
+            access your feeder on from {{ env_value_by_tag('tar1090port') }} to {{ env_value_by_tag('webport') }},
+            unless you filter this out through some firewall settings (which isn't something this image supports).
+          </label>
+        </div>
+        <div class="col-4">
+          <button type="submit" class="btn btn-primary mx-auto w-100" name="no_config_link" value="go">Disable config link</button>
+        </div>
+      </div>
+    </form>
+  </div>
+  {% else %}
+  <div class="col-12 col-lg-6">
+    <h5 class="mt-4">Show config link on map page</h5>
+    <form method="POST" onsubmit="show_spinner(); return true;">
+      <div class="row align-items-center">
+        <div class="col-8">
+          <label for="allow_config_link">Reenable the link to the adsb.im feeder image home page on the map page.
+            Please make sure that both the map port {{ env_value_by_tag('tar1090port') }} and the feeder UI port
+            {{ env_value_by_tag('webport') }} are accessible to users.
+          </label>
+        </div>
+        <div class="col-4">
+          <button type="submit" class="btn btn-primary mx-auto w-100" name="allow_config_link" value="go">Enable config link</button>
+        </div>
+      </div>
+    </form>
+  </div>
+  {% endif %}
+  {% if is_enabled('docker_concurrent') %}
+  <div class="col-12 col-lg-6">
+    <h5 class="mt-4">Docker pull: Disable concurrent downloads</h5>
+    <form method="POST" onsubmit="show_spinner(); return true;">
+      <div class="row align-items-center">
+        <div class="col-8">
+          <label for="disable_parallel_docker">
+            Disabling concurrent downloads can be helpful on slow connections to avoid update
+            failures or improve update speed slightly.
+          </label>
+        </div>
+        <div class="col-4">
+          <button type="submit" class="btn btn-primary mx-auto w-100" name="disable_parallel_docker" value="go">
+            Disable concurrency</button>
+        </div>
+      </div>
+    </form>
+  </div>
+  {% else %}
+  <div class="col-12 col-lg-6">
+    <h5 class="mt-4">Docker pull: Enable concurrent downloads</h5>
+    <form method="POST" onsubmit="show_spinner(); return true;">
+      <div class="row align-items-center">
+        <div class="col-8">
+          <label for="enable_parallel_docker">
+            Concurrent downloads are the default behavior and work well on most connections.
+            However, not using concurrent downloads can be helpful on slow connections to avoid
+            update failures or improve update speed slightly.
+          </label>
+        </div>
+        <div class="col-4">
+          <button type="submit" class="btn btn-primary mx-auto w-100" name="enable_parallel_docker" value="go">
+            Enable concurrency</button>
+        </div>
+      </div>
+    </form>
+  </div>
+  {% endif %}
+  {% if is_enabled('docker_ipv6') %}
+  <div class="col-12 col-lg-6">
+    <h5 class="mt-4">Docker bridge network IPv6</h5>
+    <form method="POST" onsubmit="show_spinner(); return true;">
+      <div class="row align-items-center">
+        <div class="col-8">
+          <label for="docker_ipv6--disable">
+              The docker bridge network has been configured to enable IPv6.
+          </label>
+        </div>
+        <div class="col-4">
+          <button type="submit" class="btn btn-primary mx-auto w-100" name="docker_ipv6--disable" value="go">
+            Disable docker bridge IPv6</button>
+        </div>
+      </div>
+    </form>
+  </div>
+  {% else %}
+  <div class="col-12 col-lg-6">
+    <h5 class="mt-4">Docker bridge network IPv6</h5>
+    <form method="POST" onsubmit="show_spinner(); return true;">
+      <div class="row align-items-center">
+        <div class="col-8">
+          <label for="docker_ipv6--enable">
+              The docker bridge network by default does not have IPv6 enabled.
+              Rare connectivity issues make it useful to enable it, in general this is not recommended.
+          </label>
+        </div>
+        <div class="col-4">
+          <button type="submit" class="btn btn-primary mx-auto w-100" name="docker_ipv6--enable" value="go">
+            Enable docker bridge IPv6</button>
+        </div>
+      </div>
+    </form>
+  </div>
+  {% endif %}
+  <div class="col-12 col-lg-6">
+    <h5 class="mt-4">SDRPlay: Ignore Serial</h5>
+    <form method="POST" onsubmit="show_spinner(); return true;">
+      <div class="row align-items-center">
+        <div class="col-8">
+          <label for="sdrplay_ignore_serial--{% if is_enabled('sdrplay_ignore_serial') %}disable{% else %}enable{% endif %}">
+              Some SDRPlay / RSP devices will not always show up with serial.
+              If only one SDRPlay device is connected, enable this option to ignore the serial.
+          </label>
+        </div>
+        <div class="col-4">
+          <button type="submit" class="btn btn-primary mx-auto w-100"
+            name="sdrplay_ignore_serial--{% if is_enabled('sdrplay_ignore_serial') %}disable{% else %}enable{% endif %}"
+            value="go">
+            {% if is_enabled('sdrplay_ignore_serial') %}Disable{% else %}Enable{% endif %}
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+  <div class="col-12 col-lg-6">
+    <h5 class="mt-4">Prometheus / Grafana / Influx / Telegraf</h5>
+    <form method="POST" onsubmit="show_spinner(); return true;">
+      <div class="row align-items-center">
+        <div class="col-8">
+          <label for="telegraf_adsb">
+            Generally unsupported option to enable telegraf in the image. Only enable this if you really
+            understand what you are doing.
+          </label>
+        </div>
+        <div class="col-4">
+          <button type="submit" class="btn btn-primary mx-auto w-100" name="telegraf_adsb--{% if is_enabled('telegraf_adsb') %}disable{% else %}enable{% endif %}" value="go">
+            {% if is_enabled('telegraf_adsb') %}Disable{% else %}Enable{% endif %} telegraf
+          </button>
+        </div>
+      </div>
+      <div class="mt-2">
+        <span onclick="$('#telegraf_explain').toggleClass('d-none'); $(this).find('.toggle-icon').text($('#telegraf_explain').hasClass('d-none') ? '▶' : '▼'); return false;"
+              style="cursor: pointer;">
+          <span class="toggle-icon small">▶</span> <strong class="small">More information</strong>
+        </span>
+        <div class="small d-none mt-2" id="telegraf_explain">
+          If you just want basic prometheus statistics for grafana, there is no need to enable
+          this, basic metrics are always available using the same URL as the tar1090 map
+          interface with /metrics added.
+          <br>
+          For a normal setup or stage2 combined data this means just add a prometheus scrape job
+          with target 192.168.2.33:8080 (:1099 on app install).
+          <br>
+          For individual stage2 sites where the tar1090 map interface is available at :8080/2
+          for example, you will need to add metrics_path: /2/metrics.
+          <br>
+          Some people would like to feed data into influx or do fancy graphs with prometheus / grafana.
+          For this you can activate this container.
+          <br>
+          On a stage2 this will only cover combined data, adding more of this container for each
+          stage2 site is probably not gonna happen but you could run probably enable this
+          container for each individual site if you really wanted to.
+          <br>
+          The prometheus output will automatically be available on port 9273.
+          <br>
+          Influx needs to be configured via the respective environment variables:
+          https://github.com/sdr-enthusiasts/docker-telegraf-adsb
+          <br>
+          Please understand this is only meant for expert users, if you ask about this features
+          just know that we are reluctant to fully support this.  If you have questions about
+          influx / grafana / prometheus, try and use one of the non-adsb.im channels on the
+          SDR-E discord, they are better suited there.
+        </div>
+      </div>
+    </form>
+  </div>
+  <div class="col-12 col-lg-6">
+    <h5 class="mt-4">Add additional ACARS feeds</h5>
+    <form method="POST">
+      <div class="row align-items-center">
+        <div class="col-12 mb-2">
+          <label for="acars_extra_feeds">
+            <br>Example: acars,udp,feed.example.net:5550
+            <br>Example: vdl2,udp,feed.example.net:5555
+            <br>Example: vdl2,tcp,feed.example.net:5555
+            <br>Make sure have each entry on a new line
+          </label>
+        </div>
+        <div class="col-12">
+          <textarea class="mx-auto w-100" id="acars_extra_feeds" name="acars_extra_feeds" rows="10"
+                    placeholder="acars,udp,feed.example.net:5550"
+                    >{{ env_value_by_tag('acars_extra_feeds') }}</textarea>
+        </div>
+        <div class="col-4">
+          <button type="submit" class="btn btn-primary mx-auto w-100" name="acars_extra_feeds--submit"
+                  value="go">Apply</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

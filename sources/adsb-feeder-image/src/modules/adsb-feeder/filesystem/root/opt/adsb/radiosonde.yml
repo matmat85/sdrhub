@@ -1,0 +1,25 @@
+services:
+  radiosonde:
+    image: ${RADIOSONDE_CONTAINER}
+    container_name: radiosonde
+    hostname: radiosonde
+    restart: unless-stopped
+    networks:
+      - adsb_im_bridge
+    ports:
+      - ${AF_RADIOSONDE_PORT:-9989}:5000
+    healthcheck:
+      disable: true
+    tmpfs:
+      - /run:exec,size=64M
+      - /var/log:size=64M
+    device_cgroup_rules:
+      - "c 189:* rwm"
+    volumes:
+      - /opt/adsb/radiosonde/station.cfg:/opt/auto_rx/station.cfg:ro
+      - /opt/adsb/radiosonde/log/:/opt/auto_rx/log
+      - /dev/bus/usb:/dev/bus/usb:ro
+    environment:
+      - PLACEHOLDER_ENV_VAR_42=true
+      # USER_PROVIDED_ENV_START
+      # USER_PROVIDED_ENV_END

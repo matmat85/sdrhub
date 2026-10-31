@@ -1,0 +1,460 @@
+{% extends 'base.html' %}
+{% set active_page = "sdr_setup" %}
+{% block content %}
+<h1 class="mt-3 text-center text-danger">
+  {% block title %}SDR Setup{% endblock %}
+</h1>
+  <div>
+    {% with messages = get_flashed_messages() %}
+    {% if messages %}
+    {% for message in messages %}
+    <div class="alert alert-warning">
+      {{ message }}
+    </div>
+    {% endfor %}
+    {% endif %}
+    {% endwith %}
+  </div>
+<form class="row gy-2 gx-3 align-items-center" method="post">
+  <button type="submit" class="btn btn-primary btn-rounded  btn-block btn-lg p-4 mb-3" name="sdr_setup" value="go" onclick="submit_sdr_changes(); return true;">
+    apply settings</button>
+
+  <div class="col-12">
+    <div id="max_sdrs" class="my-3" style="display: none;">
+      <p class="text-warning">The number of SDRs connected to your system may be too much for your hardware.</p>
+      <p id="max_sdrs_text"></p>
+      <p>It's hard to give any specific hard limits, but generally speaking, most single board computers (maybe with
+        the exception of the RPi5) can't handle more than 3 SDRs, possibly only 2 if one of them is an Airspy.
+        An RPi5 appears to be able to handle 4 SDRs as long as they are split across the two USB controllers.
+        For PCs the number depends on a lot of factors, including on how many separate USB controllers you can use.
+        We have seen users run into no issues with 6 SDRs on one controller (with a powered hub), but other
+        reports show issues with as few as 3 SDRs on a single controller.</p>
+    </div>
+    <div class="row" id="multipleSdrs">
+      <div class="col-sm-12 mt-5 mb-3 text-danger" style="display: none;" id="duptext">
+        <p>There are multiple SDRs with serial number <span id="duplicates"></span>. This will not work correctly. Please
+          ensure that all SDRs have distinct serial numbers.</p>
+        <p>We have added a somewhat experimental feature to allow you to change the serial number of an RTLSDR from this
+          UI, but that process isn't automatic and requires access to the system that you are working on. If you want to
+          try this, please go to the <a href="/change_sdr_serial_ui">change SDR serial number</a> page.</p>
+      </div>
+      <div class="col-sm-12 mt-4 mb-3" style="display: block;" id="noduptext">
+        <p>If the table of SDRs isn't consistent with your hardware, click on CHECK SDRS.</p>
+        <p><strong>To edit the properties of an SDR, click on that line in the table below.</strong></p>
+      </div>
+      <div class="col-sm-3 mb-2">
+        <button class="btn btn-secondary btn-rounded" type="button" name="update_sdr_info" onclick="sdr_info()">Check
+          SDRs</button>
+      </div>
+    </div>
+    <div class="row gx-0">
+      <div class=".g-0">
+        <table class="table table-sm" id="sdr_table">
+          <thead class="table-info bg-gradient text-dark">
+            <tr>
+              <th scope="col">Type</th>
+              <th scope="col">Serial</th>
+              <th scope="col" style="white-space: nowrap;">Use for</th>
+              <th scope="col">Gain</th>
+              <th scope="col" class="text-center" >biastee</th>
+            </tr>
+          </thead>
+          <tbody>
+          {% for sdr in [ "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15" ] %}
+            <tr id="sdr{{ sdr }}" class="d-none" onclick="sdr_setup_show_dialog({{ sdr }})" data-mdb-ripple-init data-mdb-ripple-color="dark" title="Click to configure this SDR">
+              <td id="sdr{{ sdr }}-type"></td>
+              <td id="sdr{{ sdr }}-serial" class="text-break"></td>
+              <td id="sdr{{ sdr }}-purpose"></td>
+              <td id="sdr{{ sdr }}-gain"></td>
+              <td id="sdr{{ sdr }}-biastee" class="text-center"></td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 mb-3">
+    <button class="btn btn-secondary btn-rounded" type="button" data-mdb-toggle="collapse" data-mdb-target="#showlsusb"
+            aria-expanded="false" aria-controls="showlsusb">toggle lsusb output</button>
+    <div class="fw-light collapse" id="showlsusb">
+      <h5 class="mt-3">lsusb output</h5>
+      <div class="row">
+        <pre class="col-12 smal" id="lsusb_text"></pre>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 mb-3" id="rtl_serial_change" style="display: none;">
+    If needed, you can <a href="/change_sdr_serial_ui">change the serial number of an RTLSDR</a> on a separate page.
+    Please do that before making assignments as those are tracked by serial number.
+  </div>
+  <div class="col-12 gy-2 gx-3 align-items-center" id="noSdrs" style="display: none;">
+    No SDRs found. If you have SDRs attached to the computer this software is running on, then a reboot may be
+    required before the web UI can see the SDRs.
+  </div>
+  <div class="col-12 gy-2 gx-3 align-items-center form-group" id="remote_sdr"
+       {% if is_enabled('stage2') or env_value_by_tag('1090serial') != '' or is_enabled('airspy') %}style="display: none;"
+       {% endif %}>
+    <label class="form-label" for="remote_sdr">
+      If you are intending to use this feeder with a remote device that has the ADS-B SDR connected to it and offers
+      <code>beast_out</code> (like the micro
+      feeder setup that this image supports), please enter the IPv4 address here (and the port used if it's not
+      30005):</label>
+    <input type="text" id="remote_sdr" name="remote_sdr" class="form-control mb-2"
+           pattern="^\s*(?:\d{1,3}\.){3}\d{1,3}(?:,\s*\d+)?\s*$" title="IPv4 address and port, separated by a comma"
+           placeholder="IP-address[,port]" value="{{ env_value_by_tag("remote_sdr") }}" />
+  </div>
+  <button type="submit" class="btn btn-primary btn-rounded  btn-block btn-lg p-4 mb-3 mt-3" name="sdr_setup"
+          value="go" onclick="submit_sdr_changes(); return true;">apply settings</button>
+  <input type="hidden" id="sdr_setup_data" name="sdr_setup_data" value="" />
+</form>
+
+<!-- Modal -->
+<div class="modal fade" id="sdrsetup_dialog" tabindex="-1" aria-labelledby="sdrsetup_label" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="sdrsetup_label">Set up SDR #<span id="sdr_num"></span> serial <span id="sdr_serial"></span></h5>
+        <button type="button" class="btn-close" data-mdb-ripple-init data-mdb-dismiss="modal"
+                aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row">
+          <div class="col-12 d-flex">
+            <label class="flex-grow-1">Used for</label>
+            {% if env_value_by_tag('aggregator_choice') != 'nonadsb' %}
+            <label class="mx-1"><input id="usage1090" type="radio" name="usage" value="1090"> 1090</label>
+            {% if is_enabled('stage2') %}<label class="mx-1"><input id="usage1090_2" type="radio" name="usage" value="1090_2"> 1090_2</label>{% endif %}
+            <label class="mx-1"><input id="usage978" type="radio" name="usage" value="978"> 978</label>
+            {% endif %}
+            {% if is_enabled('acarsdec') %}<label class="mx-1"><input id="usageacars" type="radio" name="usage" value="acars"> ACARS</label>{% endif %}
+            {% if is_enabled('acarsdec2') %}<label class="mx-1"><input id="usageacars_2" type="radio" name="usage" value="acars_2"> ACARS_2</label>{% endif %}
+            {% if is_enabled('dumpvdl2') %}<label class="mx-1"><input id="usagevdl2" type="radio" name="usage" value="vdl2"> VDLM2</label>{% endif %}
+            {% if is_enabled('dumphfdl') %}<label class="mx-1"><input id="usagehfdl" type="radio" name="usage" value="hfdl"> HFDL</label>{% endif %}
+            {% if is_enabled('shipfeeder') %}<label class="mx-1"><input id="usageais" type="radio" name="usage" value="ais"> AIS</label>{% endif %}
+            {% if is_enabled('sonde') %}<label class="mx-1"><input id="usagesonde" type="radio" name="usage" value="sonde"> Sonde</label>{% endif %}
+            <label class="mx-1"><input id="usageother" type="radio" name="usage" value="other"> Other</label>
+          </div>
+          <div class="col-12" id="gain_container">
+            <label class="col-12 mt-2">Gain</label>
+            <label for="sdrgain" id="gain_label"class="col-12 col-sm-9">
+            </label>
+            <input class="col-10 col-sm-2 ms-3" id="sdrgain" name="sdrgain" type="text" style="height: 2rem;" value="" />
+          </div>
+          <div class="col-12" id="biastee_container">
+            <div class="col-12 form-check mt-3 ms-3">
+              <input class="form-check-input me-1" type="checkbox" name="enable_biastee" id="enable_biastee" />
+              <label for="enable_biastee" class="form-check-label">Enable biastee</label>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-mdb-ripple-init data-mdb-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" data-mdb-ripple-init onclick="save_sdr_setup()">OK</button>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+  let sdrs = [];
+  let frequencies = {};
+  let sdr_setup_dialog = $("#sdrsetup_dialog");
+  let modal = new mdb.Modal(sdr_setup_dialog)
+  let consumers = ["1090",
+      "978", "other"
+      {% if is_enabled('stage2') %}, "1090_2"{% endif %}
+      {% if is_enabled('acarsdec') %}, "acars"{% endif %}
+      {% if is_enabled('acarsdec2') %}, "acars_2"{% endif %}
+      {% if is_enabled('dumpvdl2') %}, "vdl2"{% endif %}
+      {% if is_enabled('dumphfdl') %}, "hfdl"{% endif %}
+      {% if is_enabled('shipfeeder') %}, "ais"{% endif %}
+      {% if is_enabled('sonde') %}, "sonde"{% endif %}
+    ];
+
+  // slightly unintuitive - while we save data back to the data structures in the close function
+  // for the modal dialog - the user still needs to click the apply button before the changes
+  // really take effect. So this is the slightly annoying way to remind them to do so.
+  let changes_to_apply = false;
+
+  function sdr_info() {
+    fetch("/api/sdr_info", { signal: AbortSignal.timeout(15000) })
+      .then(response => response.json())
+      .then(data => {
+        let num = data['sdrdevices'].length;
+        console.log("num sdrs: " + num);
+        if (num == 0) {
+          document.getElementById('multipleSdrs').style.display = 'none';
+          document.getElementById('noSdrs').style.display = 'block';
+        }
+        document.getElementById("lsusb_text").innerHTML = data.lsusb_output;
+        sdrs = data['sdrdevices'];
+        frequencies = data['frequencies'];
+        console.log("Got the following SDRs from the API: " + JSON.stringify(sdrs));
+        update_ui();
+        if (data['duplicates'] != '') {
+          document.getElementById('duplicates').innerText = data['duplicates'];
+          document.getElementById("duptext").style.display = 'block';
+          document.getElementById("noduptext").style.display = 'none';
+        } else {
+          document.getElementById("duptext").style.display = 'none';
+          document.getElementById("noduptext").style.display = 'block';
+        }
+        if (data['sdr_warning'] != '') {
+          $("#max_sdrs_text").html(data['sdr_warning']);
+          $("#max_sdrs").show();
+        }
+      })
+      .catch(error => {
+        console.error('API Error for /api/sdr_info:', error);
+      });
+  }
+
+  function update_ui(force_arg) {
+    let force = force_arg || false;
+    let have_rtlsdr = false;
+    let num = sdrs.length;
+    for (let i = 0; i < num; i++) {
+      let sdr = sdrs[i];
+      if (sdr['type'] == 'rtlsdr') {
+        have_rtlsdr = true;
+      }
+      let id = '#sdr' + i;
+      $(id).removeClass('d-none');
+      $(id + "-serial").html(sdr['serial']);
+      $(id + "-type").html(sdr['type']);
+      $(id + "-gain").html(sdr['gain']);
+      if (sdr['biastee']) {
+        $(id + "-biastee").html("\u2713");
+      } else {
+        $(id + "-biastee").html("");
+      }
+      let purpose = sdr['purpose'];
+      if (!force) {
+        for (const [freq, serial] of Object.entries(frequencies)) {
+          if (serial == sdr['serial']) {
+            purpose = freq;
+          }
+        }
+      }
+      // we have other-0 .. other-15, but that's an implementation detail that we hide from the user
+      if (purpose.startsWith('other')) {
+        purpose = 'other';
+      }
+      $(id + "-purpose").html(purpose);
+    }
+    $("#rtl_serial_change").toggle(have_rtlsdr);
+    for (let i = num; i < 16; i++) {
+      let id = 'sdr' + i;
+      document.getElementById(id).style.display = 'none';
+    }
+  }
+
+  sdr_info();
+
+  function validate_0_50_auto(text) {
+    return text.replace(/\s/g, '') != '' && (text.startsWith('auto') || (text >= 0 && text <= 50));
+  }
+
+  function validate_0_21_auto(text) {
+    return text.replace(/\s/g, '') != '' && (text.startsWith('auto') || (text >= 0 && text <= 21));
+  }
+
+  function validate_0_21_empty(text) {
+    return text == '' || (text >= 0 && text <= 21);
+  }
+
+  function validate_0_21(text) {
+    return text.replace(/\s/g, '') != '' && text >= 0 && text <= 21;
+  }
+
+  function validate_0_50(text) {
+    return text.replace(/\s/g, '') != '' && text >= 0 && text <= 50;
+  }
+
+  function validate_0_50_minus10(text) {
+    return text.replace(/\s/g, '') != '' && (text == -10 || (text >= 0 && text <= 50));
+  }
+
+  function validate_20_59(text) {
+    return text.replace(/\s/g, '') != '' && text >= 20 && text <= 59;
+  }
+
+  function validate_20_59_minus10(text) {
+    return text.replace(/\s/g, '') != '' && (text == -10 || (text >= 20 && text <= 59));
+  }
+
+  function validate_20_59_empty(text) {
+    return text == '' || (text >= 20 && text <= 59);
+  }
+
+  function validate_0_45_empty(text) {
+    return text == '' || (text >= 0 && text <= 45);
+  }
+
+  function validate_empty(text) {
+    return text == '';
+  }
+
+  const gain_text = {
+    '1090': {
+      'rtlsdr': ['enter a value between 0 and 50 or "auto"', validate_0_50_auto],
+      'airspy': ['enter a value between 0 and 21 or "auto"', validate_0_21_auto],
+      'sdrplay': ['always uses agc - leave empty', validate_empty],
+    },
+    '1090_2': {
+      'rtlsdr': ['enter a value between 0 and 50 or "auto"', validate_0_50_auto],
+      'airspy': ['enter a value between 0 and 21 or "auto"', validate_0_21_auto],
+      'sdrplay': ['always uses agc - leave empty', validate_empty],
+    },
+    '978': {
+      'rtlsdr': ['enter a value between 0 and 50 or "auto"', validate_0_50_auto],
+    },
+    'acars': {
+      'rtlsdr': ['enter a value between 0 and 50; use -10 for agc', validate_0_50_minus10],
+      'airspy': ['enter a value between 0 and 21', validate_0_21],
+      'sdrplay': ['enter a value between 20 and 59; use -10 for agc', validate_20_59_minus10],
+
+    },
+    'acars_2': {
+      'rtlsdr': ['enter a value between 0 and 50; use -10 for agc', validate_0_50_minus10],
+      'airspy': ['enter a value between 0 and 21', validate_0_21],
+      'sdrplay': ['enter a value between 20 and 59; use -10 for agc', validate_20_59_minus10],
+    },
+    'vdl2': {
+      'rtlsdr': ['enter a value between 0 and 50', validate_0_50],
+      'sdrplay': ['enter a value between 20 and 59, leave empty for agc', validate_20_59_empty],
+    },
+    'hfdl': {
+      'rtlsdr': ['enter a value between 0 and 50', validate_0_50],
+      'airspy': ['enter a value between 0 and 21, leave empty for agc', validate_0_21_empty],
+      'airspyhf': ['enter a value between 0 and 21, leave empty for agc', validate_0_21_empty],
+      'sdrplay': ['enter a value between 0 and 45, leave empty for agc', validate_0_45_empty],
+    },
+    'ais': {
+      'rtlsdr': ['enter a value between 0 and 50 or auto', validate_0_50_auto],
+      'airspy': ['enter a value between 0 and 21', validate_0_21],
+      'airspyhf': ['always uses agc - leave empty', validate_empty],
+      'sdrplay': ['enter a value between 20 and 59', validate_20_59],
+    },
+    'sonde': {
+      'rtlsdr': ['enter a value between 0 and 50 or "auto"', validate_0_50_auto],
+    }
+  }
+  function update_gain_text(sdr_given) {
+    let purpose = $('input[name="usage"]:checked').val();
+    let sdr = sdr_given || sdrs[$("#sdr_num").text()];
+    if (Object.keys(gain_text).includes(purpose) && Object.keys(gain_text[purpose]).includes(sdr['type'])) {
+      console.log("gain_text for " + purpose + " and " + sdr['type'] + " is " + gain_text[purpose][sdr['type']]);
+      $("#gain_label").text(gain_text[purpose][sdr['type']][0]);
+    } else {
+      $("#gain_label").text("please check the docs for valid gain values");
+    }
+  }
+
+  function update_biastee(sdr_given, purpose_given) {
+    let sdr = sdr_given || sdrs[$("#sdr_num").text()];
+    let purpose = purpose_given || sdr['purpose'];
+    let show_biastee = purpose == 'ais' && (sdr['type'] == 'rtlsdr' || sdr['type'] == 'airspy');
+    show_biastee |= purpose == 'vdl2' && sdr['type'] == 'rtlsdr';
+    show_biastee |= purpose == 'acars' && ['rtlsdr', 'airspy'].includes(sdr['type']);
+    show_biastee |= purpose == 'acars_2' && ['rtlsdr', 'airspy'].includes(sdr['type']);
+    show_biastee |= purpose == '1090' || purpose == '1090_2' || purpose == '978' || purpose == 'sonde';
+    console.log(`update_biastee: ${show_biastee} for purpose: ${purpose}, type: ${sdr['type']}`);
+    if (show_biastee) {
+      $("#biastee_container").show();
+      $("#enable_biastee").prop('checked', sdr['biastee']);
+    } else {
+      $("#biastee_container").hide();
+    }
+  }
+
+  function sdr_setup_show_dialog(sdr_idx) {
+    $(document).ready(function() {
+      let sdr = sdrs[sdr_idx];
+      console.log("sdr_setup_show_dialog(" + sdr_idx + ") called for " + JSON.stringify(sdr));
+      if (!consumers.includes(sdr['purpose'])) {
+        sdr['purpose'] = 'other';
+      }
+      $("#sdr_num").text(sdr_idx);
+      $("#sdr_serial").text(sdr['serial']);
+      // this feels convoluted
+      // only an AirspyHF doesn't support 1090 or ACARS
+      $("#usage1090").parent().toggle(sdr['type'] != "airspyhf");
+      $("#usage1090_2").parent().toggle(sdr['type'] != "airspyhf");
+      $("#usageacars").parent().toggle(sdr['type'] != "airspyhf");
+      $("#usageacars_2").parent().toggle(sdr['type'] != "airspyhf");
+      // only an RTLSDR supports 978 or Sonde
+      $("#usage978").parent().toggle(sdr['type'] == "rtlsdr");
+      $("#usagesonde").parent().toggle(sdr['type'] == "rtlsdr");
+      // Airspy devices aren't supported for VDL
+      $("#usagevdl2").parent().toggle(!sdr['type'].startsWith("airspy"));
+      // all the other containers support all SDRs (that can't be right?)
+
+      $("#usage" + sdr['purpose']).prop('checked', true);
+      $("#usage" + sdr['purpose']).trigger('change');
+      $("#sdrgain").val(sdr['gain']);
+      update_biastee(sdr);
+      update_gain_text(sdr);
+      modal.show();
+    });
+  }
+
+  $('input[name="usage"][type="radio"]').on('change', function () {
+    console.log("usage changed to " + this.value);
+    $("#gain_container").toggle(this.value != "other");
+    update_gain_text();
+    update_biastee(sdrs[$("#sdr_num").text()], this.value);
+  });
+
+  // mildly pointless convenience function - this makes it easier to write the assignment in
+  // the save_sdr_setup function as a single line
+  function set_change_flag(old_value, new_value) {
+    if (old_value != new_value) {
+      changes_to_apply = true;
+    }
+    return new_value;
+  }
+
+  function save_sdr_setup() {
+    let sdr = $("#sdr_num").text();
+    let gain = $("#sdrgain").val();
+    let biastee = $("#enable_biastee").is(":checked");
+    let purpose = $('input[name="usage"]:checked').val();
+    let type = sdrs[sdr]['type'];
+    if (Object.keys(gain_text).includes(purpose) && Object.keys(gain_text[purpose]).includes(type)) {
+      const validate = gain_text[purpose][type][1];
+      if (!validate(gain)) {
+        alert(gain_text[purpose][type][0]);
+        return false;
+      }
+    }
+    if (purpose == 'other') {
+      purpose = 'other-' + sdr;
+    }
+    sdrs[sdr]['gain'] = set_change_flag(sdrs[sdr]['gain'], gain);
+    sdrs[sdr]['biastee'] = set_change_flag(sdrs[sdr]['biastee'], biastee);
+    if (purpose != sdrs[sdr]['purpose']) {
+      // if another SDR already had this purpose, switch that to 'other'
+      for (let i = 0; i < sdrs.length; i++) {
+        if (sdrs[i]['purpose'] == purpose) {
+          sdrs[i]['purpose'] = 'other-' + i;
+        }
+      }
+      changes_to_apply = true;
+      sdrs[sdr]['purpose'] = purpose;
+    }
+    modal.hide();
+    update_ui(true);
+  }
+
+  function submit_sdr_changes() {
+    if (changes_to_apply) {
+      console.log("submit_sdr_changes: " + JSON.stringify(sdrs));
+      $('#sdr_setup_data').val(JSON.stringify(sdrs));
+    } else {
+      console.log("submit_sdr_changes: no changes to apply");
+    }
+  }
+</script>
+{% endblock %}

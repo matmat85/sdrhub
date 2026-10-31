@@ -1,0 +1,136 @@
+#!/usr/bin/env bash
+# overall distro module for ADSB.im feeder image
+# Written by Dirk Hohndel <dirk@hohndel.org>
+# GPL V3
+########
+
+
+# Source error handling, leave this in place
+set -x
+set -e
+
+source /common.sh
+install_cleanup_trap
+
+unpack /filesystem/root /
+
+# speed up apt-get operations by not rebuilding the man-db cache:
+rm -f /var/lib/man-db/auto-update
+
+DEBIAN_DISTRO=$(grep /etc/os-release -e VERSION_CODENAME | cut -d= -f2)
+
+# free up space
+apt-get autoremove -y dpkg-dev gdb build-essential \
+    mkvtoolnix iso-codes shared-mime-info \
+    rpicam-apps-lite\* p7zip\* \
+    gcc-14 gcc-14-for-host \
+    cloud-init \
+    rpi-connect-lite \
+    xauth \
+    file \
+    strace \
+    make \
+    || true
+
+# removing saves around X MBytes in images size
+# gcc: 60
+# cloud-init: 10
+# rpi-connect-lite: 7
+# xauth: 1
+# file: 1
+# strace: 2
+
+echo "building on $(hostname) - available disk space inside the image:"
+df -h
+mount
+echo "127.0.1.1 $(hostname)" 2>/dev/null >> /etc/hosts
+
+# brute force set up an authorized_keys file for root
+mkdir -p ~root/.ssh
+echo "$SSH_PUB_KEY" >> ~root/.ssh/authorized_keys
+echo "$SSH_PUB_KEY" > ~root/.ssh/adsb.im.installkey
+touch /opt/adsb/adsb.im.passwd.and.keys
+
+# work around trixie issue with default ssh config that doesn't work ... SERIOUSLY Raspberry Pi you
+# released this image without ssh working?!
+sed -i -e 's/IPQoS 0x00/#\0/' /etc/ssh/sshd_config
+
+
+# setup Python/Flask
+apt-get update --allow-releaseinfo-change
+
+apt-get install -y --no-install-recommends python3 python3-flask python3-requests python3-cryptography
+
+# install chrony for better time synchronization compared to systemd-timesyncd
+apt-get install -y --no-install-recommends chrony
+# instead of only allowing stepping the clock for 3 updates after startup,
+# always step the clock if it's off by more than 0.5 seconds
+sed -i -e 's/^makestep.*/makestep 0.5 -1/' /etc/chrony/chrony.conf
+
+if [ "$FEEDER_IMAGE_NAME" != "" ] ; then
+	echo "$FEEDER_IMAGE_NAME" > /opt/adsb/feeder-image.name
+else
+	echo "custom built feeder image" > /opt/adsb/feeder-image.name
+fi
+echo "Using feeder image name $(cat /opt/adsb/feeder-image.name)"
+
+# setup initial .env with container versions
+mkdir -p /opt/adsb/config
+ENV_FILE=/opt/adsb/config/.env
+cp /opt/adsb/docker.image.versions "$ENV_FILE"
+echo "_ADSBIM_BASE_VERSION=$(cat /opt/adsb/adsb.im.version)" >> "$ENV_FILE"
+echo "_ADSBIM_CONTAINER_VERSION=$(cat /opt/adsb/adsb.im.version)" >> "$ENV_FILE"
+
+rm -f /boot/ADSB-README.txt
+
+# Install dependencies
+apt-get install -y \
+    gnupg hostapd isc-dhcp-server avahi-utils \
+    git rtl-sdr \
+    apt-transport-https ca-certificates curl gnupg2 \
+    jq zstd netcat-openbsd
+
+df -h
+
+systemctl mask hostapd.service
+systemctl mask isc-dhcp-server.service
+
+
+df -h
+
+# disable swapfile, we have swap on zram
+systemctl disable dphys-swapfile || true
+
+# disable raspbian trixie swap stuff
+[[ -f /etc/rpi/swap.conf ]] && sed -i -e 's/^.*Mechanism=.*/Mechanism=none/' /etc/rpi/swap.conf
+
+
+# If we are armbian, we do something with networking
+if [ "$BASE_DISTRO" = "armbian" ] ; then
+	apt-get install -y network-manager net-tools
+
+	echo "127.0.0.1 adsb-feeder.local" >> /etc/hosts
+
+	# ensure that we get predictable interface names
+	echo "extraargs=net.ifnames=0" >> /boot/armbianEnv.txt
+	if [[ -f /usr/lib/systemd/system/armbian-firstrun-config.service ]] ; then
+		sed -i 's/Wants=network-online.target/Wants=network-pre.target/;s/After=network.target network-online.target/Before=wpa_supplicant.service network.target network-online.target/' /usr/lib/systemd/system/armbian-firstrun-config.service
+		systemctl list-unit-files armbian-firstrun-config &>/dev/null && systemctl enable armbian-firstrun-config
+	fi
+fi
+
+# Enable services at boot
+systemctl enable adsb-bootstrap.service
+readarray -t services_enable < /opt/adsb/misc/services
+readarray -t services_image < /opt/adsb/misc/services_image
+services_enable+=( "${services_image[@]}" )
+systemctl enable "${services_enable[@]}"
+
+# Disable some things we don't need and that only eat memory (assuming they exist)
+systemctl disable bluetooth.service || true
+systemctl disable ModemManager.service || true
+
+
+# finally, create a flag file as indicator that this is a complete ADS-B Feeder
+# Image, and not just the app running on a different OS.
+touch /opt/adsb/os.adsb.feeder.image

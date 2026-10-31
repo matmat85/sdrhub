@@ -1,0 +1,16 @@
+services:
+  hfdlobserver:
+    image: ${HFDLOBSERVER_CONTAINER}
+    healthcheck:
+      disable: true
+    container_name: hfdlobserver
+    hostname: hfdlobserver
+    restart: unless-stopped
+    networks:
+      - adsb_im_bridge
+    volumes:
+      - /opt/adsb/hfdlobserver/compose:/run/hfdlobserver
+    environment:
+      - PLACEHOLDER_ENV_VAR_42=true
+      # USER_PROVIDED_ENV_START
+      # USER_PROVIDED_ENV_END
