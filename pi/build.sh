@@ -41,6 +41,9 @@ cp -a "$ROOT/sources/adsb-feeder-image" "$MOUNT/opt/loft-source/"
 cp -a "$ROOT/pi" "$MOUNT/opt/loft-source/pi"
 install -m 0644 "$ROOT/pi/receiver.py" "$ROOT/pi/firstboot.py" "$MOUNT/usr/local/lib/loft/"
 chroot "$MOUNT" /bin/bash /opt/loft-source/pi/install.sh
+chroot "$MOUNT" python3 -m compileall -q /opt/adsb/adsb-setup /usr/local/lib/loft
+chroot "$MOUNT" systemd-analyze verify loft-firstboot.service loft-firewall.service loft-rtl-tcp.service
+chroot "$MOUNT" systemctl is-enabled docker loft-firstboot loft-firewall loft-rtl-tcp adsb-setup
 rm "$MOUNT/etc/resolv.conf"
 mv "$ROOT/build/original-resolv.conf" "$MOUNT/etc/resolv.conf"
 [[ ! -e "$MOUNT/etc/loft-receiver/provisioned" && ! -e "$MOUNT/root/loft-credentials.txt" ]] ||

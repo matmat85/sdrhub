@@ -24,9 +24,13 @@ def main():
     values = json.loads(boot.read_text()) if boot.exists() else {}
     if not isinstance(values, dict):
         raise ValueError("loft.json must contain an object")
-    password = values.get("web_password") or secrets.token_urlsafe(24)
+    if set(values) - {"web_password", "receiver"}:
+        raise ValueError("loft.json accepts only web_password and receiver")
+    password = values["web_password"] if "web_password" in values else secrets.token_urlsafe(24)
     if not isinstance(password, str) or len(password) < 12 or "\n" in password:
         raise ValueError("web_password must be at least 12 characters and contain no newlines")
+    if password.startswith("REPLACE_WITH_"):
+        raise ValueError("Replace the example web_password with a unique password")
     receiver = validate_config(values["receiver"]) if "receiver" in values else None
     if receiver and receiver["serial"] == "00000001":
         raise ValueError("The streaming serial conflicts with the default ADS-B dongle")

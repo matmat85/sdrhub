@@ -30,6 +30,8 @@ for service in adsb-setup adsb-docker loft-firewall loft-rtl-tcp; do
 done
 install -d /etc/systemd/system/adsb-docker.service.d
 printf '[Unit]\nRequires=loft-firewall.service\nAfter=loft-firewall.service\n' > /etc/systemd/system/adsb-docker.service.d/firewall.conf
+install -d /etc/systemd/system/docker.service.d
+printf '[Unit]\nRequires=loft-firewall.service\nAfter=loft-firewall.service\n' > /etc/systemd/system/docker.service.d/loft-firewall.conf
 systemctl enable docker loft-firstboot loft-firewall loft-rtl-tcp
 # Keep our edited application rather than replacing it with upstream updates.
 systemctl disable adsb-update.timer

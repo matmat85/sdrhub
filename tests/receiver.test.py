@@ -5,6 +5,7 @@ from types import SimpleNamespace
 import tempfile
 import os
 import sys
+import subprocess
 import unittest
 from unittest.mock import patch
 
@@ -22,6 +23,9 @@ sys.path.insert(0, str(MODULE.parent.parent))
 firstboot_spec = importlib.util.spec_from_file_location("loft_firstboot", ROOT / "pi/firstboot.py")
 firstboot = importlib.util.module_from_spec(firstboot_spec)
 firstboot_spec.loader.exec_module(firstboot)
+runner_spec = importlib.util.spec_from_file_location("loft_runner", ROOT / "pi/receiver.py")
+runner = importlib.util.module_from_spec(runner_spec)
+runner_spec.loader.exec_module(runner)
 
 
 class ReceiverTests(unittest.TestCase):
@@ -51,7 +55,8 @@ class ReceiverTests(unittest.TestCase):
         self.assertEqual(receiver.validate_config(VALID), VALID)
         for key, value in [("serial", "x; touch /tmp/x"), ("listen", "0.0.0.0"),
                            ("listen", "127.0.0.1"), ("hub_client", "8.8.8.8"),
-                           ("adsb_client", "224.0.0.1"), ("listen", 123)]:
+                           ("adsb_client", "224.0.0.1"), ("listen", "255.255.255.255"),
+                           ("hub_client", "169.254.1.2"), ("listen", 123)]:
             with self.subTest(key=key, value=value), self.assertRaises(ValueError):
                 receiver.validate_config({**VALID, key: value})
 
@@ -112,6 +117,46 @@ class FirstBootTests(unittest.TestCase):
         self.assertFalse(firstboot.BOOT_CONFIG.exists())
         self.assertEqual(json.loads(firstboot.RADIO_CONFIG.read_text()), VALID)
         self.assertTrue(firstboot.PROVISIONED.exists())
+
+
+class ServiceTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.addCleanup(patch.stopall)
+        self.config = Path(self.temp.name) / "radio.json"
+        self.env = Path(self.temp.name) / "feeder.env"
+        patch.object(runner, "Path", lambda path: self.config if path.endswith("radio.json") else self.env).start()
+
+    def test_real_firewall_defaults_closed_and_limits_each_client(self):
+        with patch.object(sys, "argv", ["receiver.py", "--firewall"]):
+            runner.main()
+            closed = subprocess.check_output(["nft", "list", "table", "inet", "loft_receiver"], text=True)
+            self.assertIn("tcp dport { 1234, 30005 } drop", closed)
+            self.config.write_text(json.dumps(VALID))
+            runner.main()
+            configured = subprocess.check_output(["nft", "list", "table", "inet", "loft_receiver"], text=True)
+            self.assertIn("ip saddr != 192.168.1.52 tcp dport 1234 drop", configured)
+            self.assertIn("ip saddr != 192.168.1.51 tcp dport 30005 drop", configured)
+            self.assertIn("meta nfproto ipv6", configured)
+
+    def test_preflight_rejects_conflicting_persisted_assignment(self):
+        self.config.write_text(json.dumps(VALID))
+        self.env.write_text("FEEDER_SERIAL_VDL2=77465553\n")
+        with patch.object(sys, "argv", ["receiver.py", "--check-assignment"]):
+            with self.assertRaises(ValueError):
+                runner.main()
+            self.env.write_text("FEEDER_SERIAL_1090=00000001\n")
+            runner.main()
+
+    def test_server_selects_serial_without_biastee(self):
+        self.config.write_text(json.dumps(VALID))
+        with patch.object(sys, "argv", ["receiver.py"]), patch.object(runner.os, "execvp") as execute:
+            runner.main()
+            args = execute.call_args.args[1]
+            self.assertEqual(args[args.index("-d") + 1], "77465553")
+            self.assertEqual(args[args.index("-s") + 1], "1024000")
+            self.assertNotIn("-T", args)
 
 
 if __name__ == "__main__":

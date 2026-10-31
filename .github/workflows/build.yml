@@ -33,7 +33,7 @@ jobs:
       - run: |
           TAG="${GITHUB_REF_NAME}"
           if [[ "$GITHUB_REF_TYPE" != tag ]]; then TAG=v0.1.0; fi
-          python3 scripts/catalogue.py "$TAG"
+          sudo python3 scripts/catalogue.py "$TAG"
       - uses: actions/upload-artifact@v4
         with:
           name: pi-image

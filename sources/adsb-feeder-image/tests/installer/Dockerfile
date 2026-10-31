@@ -1,7 +1,7 @@
 FROM ubuntu:24.04
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3 python3-flask python3-requests python3-cryptography git usbutils iproute2 \
+    python3 python3-flask python3-requests python3-cryptography git usbutils iproute2 nftables \
     && rm -rf /var/lib/apt/lists/*
 COPY . /source
 COPY tests/installer/mock-command.sh /mock/docker

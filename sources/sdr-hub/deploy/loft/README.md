@@ -1,5 +1,12 @@
 # Loft receivers with Proxmox LXC
 
+For the flashable Pi image, first-boot Wi-Fi/account provisioning and automated
+two-LXC installer, see the distribution's [main guide](../../../../README.md)
+and [Pi guide](../../../../pi/README.md). The manual services below are an
+alternative to that image; do not run a second RTL-TCP service beside the
+image's `loft-rtl-tcp` service. This distribution's scanner build deliberately
+omits the proprietary SDRplay SDK and targets RTL-SDR/RTL-TCP.
+
 This fork keeps both USB radios on the Raspberry Pi Zero 2 W:
 
 - `00000001`: the Pi decodes 1090 MHz ADS-B and exports Beast messages on port 30005.

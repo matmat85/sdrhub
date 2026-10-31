@@ -9,6 +9,7 @@ import subprocess
 from flask import abort, flash, redirect, render_template, request, session, url_for
 
 CONFIG = Path("/etc/loft-receiver/radio.json")
+PRIVATE_NETWORKS = tuple(ipaddress.IPv4Network(network) for network in ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"))
 
 
 def validate_config(value):
@@ -23,7 +24,7 @@ def validate_config(value):
         if not isinstance(raw_address, str):
             raise ValueError(f"{field} must be a private LAN IPv4 address")
         address = ipaddress.IPv4Address(raw_address)
-        if not address.is_private or address.is_unspecified or address.is_loopback or address.is_multicast:
+        if not any(address in network for network in PRIVATE_NETWORKS):
             raise ValueError(f"{field} must be a private LAN IPv4 address")
         result[field] = str(address)
     return result
